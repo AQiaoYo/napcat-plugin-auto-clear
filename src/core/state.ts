@@ -20,6 +20,7 @@ function sanitizeConfig(raw: unknown): PluginConfig {
     if (typeof (raw as Record<string, unknown>)['enabled'] === 'boolean') {
         out.enabled = (raw as Record<string, unknown>)['enabled'] as boolean;
     }
+
     // whitelist: optional map of group_id -> boolean
     const rawWhitelist = (raw as Record<string, unknown>)['whitelist'];
     if (isObject(rawWhitelist)) {
@@ -27,6 +28,43 @@ function sanitizeConfig(raw: unknown): PluginConfig {
         for (const k of Object.keys(rawWhitelist as Record<string, unknown>)) {
             if (typeof (rawWhitelist as Record<string, unknown>)[k] === 'boolean') {
                 out.whitelist[k] = Boolean((rawWhitelist as Record<string, unknown>)[k]);
+            }
+        }
+    }
+
+    // 新增：定时任务配置校验
+    if (typeof (raw as Record<string, unknown>)['globalCron'] === 'string') {
+        out.globalCron = (raw as Record<string, unknown>)['globalCron'] as string;
+    }
+    if (typeof (raw as Record<string, unknown>)['globalMessage'] === 'string') {
+        out.globalMessage = (raw as Record<string, unknown>)['globalMessage'] as string;
+    }
+    if (typeof (raw as Record<string, unknown>)['globalTargetQQ'] === 'string') {
+        out.globalTargetQQ = (raw as Record<string, unknown>)['globalTargetQQ'] as string;
+    }
+
+    // groupConfigs: optional map of group_id -> GroupCronConfig
+    const rawGroupConfigs = (raw as Record<string, unknown>)['groupConfigs'];
+    if (isObject(rawGroupConfigs)) {
+        out.groupConfigs = {};
+        for (const groupId of Object.keys(rawGroupConfigs as Record<string, unknown>)) {
+            const groupConfig = (rawGroupConfigs as Record<string, unknown>)[groupId];
+            if (isObject(groupConfig)) {
+                out.groupConfigs[groupId] = {};
+                const config = out.groupConfigs[groupId];
+
+                if (typeof (groupConfig as Record<string, unknown>)['enabled'] === 'boolean') {
+                    config.enabled = (groupConfig as Record<string, unknown>)['enabled'] as boolean;
+                }
+                if (typeof (groupConfig as Record<string, unknown>)['cron'] === 'string') {
+                    config.cron = (groupConfig as Record<string, unknown>)['cron'] as string;
+                }
+                if (typeof (groupConfig as Record<string, unknown>)['message'] === 'string') {
+                    config.message = (groupConfig as Record<string, unknown>)['message'] as string;
+                }
+                if (typeof (groupConfig as Record<string, unknown>)['targetQQ'] === 'string') {
+                    config.targetQQ = (groupConfig as Record<string, unknown>)['targetQQ'] as string;
+                }
             }
         }
     }

@@ -1,14 +1,16 @@
-// 入口：组织各个子模块并导出插件生命周期函数
+// @ts-ignore
 import type { PluginModule, NapCatPluginContext, PluginConfigSchema, PluginConfigUIController } from 'napcat-types/napcat-onebot/network/plugin-manger';
+// @ts-ignore
 import type { OB11Message } from 'napcat-types/napcat-onebot';
-import type { OB11EmitEventContent } from 'napcat-types/napcat-onebot/network';
+// @ts-ignore
 import { EventType } from 'napcat-types/napcat-onebot/event/index';
 
 import { initConfigUI } from './config';
-import { loadConfig, saveConfig, getConfig, updateConfigField } from './core/state';
+import { loadConfig, saveConfig, getConfig, updateConfigField, setGroupWhitelist } from './core/state';
 import { handleMessage } from './handlers/message-handler';
 import { getGroupsWithPermissions } from './services/group-service';
 import { runScanForGroup, getLastScanResults, startScheduler, stopScheduler } from './services/cleanup-service';
+import { startGlobalCronJob, startGroupCronJob, stopAllCronJobs, reloadAllCronJobs, getCronJobStatus } from './services/cron-service';
 
 // 导出框架期望的变量名，框架在加载模块时会读取此导出用于展示配置 UI
 export let plugin_config_ui: PluginConfigSchema = [];
@@ -127,10 +129,71 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     const newCfg = req.body || {};
                     // 保存并持久化
                     await saveConfig(ctx, { ...getConfig(), ...newCfg });
+                    // 重新加载定时任务
+                    reloadAllCronJobs(ctx);
                     res.json({ code: 0, message: 'Config saved' });
                 } catch (err) {
                     ctx.logger.error('保存配置 via /config 失败:', err);
                     res.status(500).json({ code: -1, message: String(err) });
+                }
+            });
+
+            // 获取定时任务状态
+            ctx.router.get('/cron/status', (_req: any, res: any) => {
+                try {
+                    const status = getCronJobStatus();
+                    res.json({ code: 0, data: status });
+                } catch (e) {
+                    ctx.logger.error('获取定时任务状态失败:', e);
+                    res.status(500).json({ code: -1, message: String(e) });
+                }
+            });
+
+            // 更新群的定时任务配置
+            ctx.router.post('/groups/:id/cron', async (req: any, res: any) => {
+                try {
+                    const groupId = String(req.params?.id || '');
+                    if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
+
+                    const cronConfig = req.body || {};
+                    const currentConfig = getConfig();
+
+                    // 更新群配置
+                    const groupConfigs = { ...(currentConfig.groupConfigs || {}) };
+                    groupConfigs[groupId] = {
+                        ...groupConfigs[groupId],
+                        ...cronConfig
+                    };
+
+                    // 保存配置
+                    await saveConfig(ctx, {
+                        ...currentConfig,
+                        groupConfigs
+                    });
+
+                    // 重新启动该群的定时任务
+                    startGroupCronJob(ctx, groupId);
+
+                    res.json({ code: 0, message: 'Group cron config updated', data: { group_id: groupId, config: groupConfigs[groupId] } });
+                } catch (e) {
+                    ctx.logger.error('更新群定时任务配置失败:', e);
+                    res.status(500).json({ code: -1, message: String(e) });
+                }
+            });
+
+            // 获取群的定时任务配置
+            ctx.router.get('/groups/:id/cron', (req: any, res: any) => {
+                try {
+                    const groupId = String(req.params?.id || '');
+                    if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
+
+                    const currentConfig = getConfig();
+                    const groupConfig = currentConfig.groupConfigs?.[groupId] || {};
+
+                    res.json({ code: 0, data: groupConfig });
+                } catch (e) {
+                    ctx.logger.error('获取群定时任务配置失败:', e);
+                    res.status(500).json({ code: -1, message: String(e) });
                 }
             });
             ctx.logger.debug('🔗 WebUI 页面与静态资源已注册');
@@ -149,6 +212,13 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             startScheduler(ctx);
         } catch (e) {
             ctx.logger.error('启动自动扫描调度失败:', e);
+        }
+
+        // 启动定时任务调度
+        try {
+            reloadAllCronJobs(ctx);
+        } catch (e) {
+            ctx.logger.error('启动定时任务调度失败:', e);
         }
         ctx.logger.info(`✅ ${ctx.pluginName} 插件初始化完成`);
         const current = getConfig();
@@ -170,7 +240,12 @@ const plugin_cleanup = async (ctx: NapCatPluginContext) => {
     try {
         stopScheduler();
     } catch (e) {
-        ctx.logger.debug('停止调度失败', e);
+        ctx.logger.debug('停止扫描调度失败', e);
+    }
+    try {
+        stopAllCronJobs();
+    } catch (e) {
+        ctx.logger.debug('停止定时任务失败', e);
     }
 };
 
@@ -197,6 +272,13 @@ export const plugin_on_config_change = async (
         await updateConfigField(ctx, key as any, value);
     } catch (err) {
         ctx.logger.error('❌ 更新配置失败:', err);
+    }
+
+    // 配置变化时重新加载定时任务
+    try {
+        reloadAllCronJobs(ctx);
+    } catch (err) {
+        ctx.logger.error('重新加载定时任务失败:', err);
     }
 
     // 当前仅保留一个开关，无需动态显示/隐藏其他字段

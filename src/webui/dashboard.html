@@ -284,6 +284,89 @@
             color: var(--text-secondary);
         }
 
+        .cron-section {
+            margin-bottom: 20px;
+        }
+
+        .cron-section h5 {
+            margin: 0 0 12px 0;
+            color: var(--text-primary);
+            font-size: 16px;
+        }
+
+        .cron-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .cron-form label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .cron-form input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .cron-form input:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 1px;
+        }
+
+        .group-cron-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-item);
+            border-radius: 10px;
+            padding: 12px 14px;
+            box-shadow: 0 1px 6px 0 var(--accent-light);
+            margin-bottom: 8px;
+        }
+
+        .group-cron-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .group-cron-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .group-cron-form {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .group-cron-form input {
+            padding: 6px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            width: 120px;
+        }
+
+        .group-cron-form input:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 1px;
+        }
+
         @media (max-width: 600px) {
             .container {
                 max-width: 100%;
@@ -318,6 +401,29 @@
         <div class="card">
             <h4>扫描候选（Dry-run）</h4>
             <div id="candidates" class="candidate-list muted">尚未扫描</div>
+        </div>
+        <div class="card">
+            <h4>定时任务配置</h4>
+            <div id="cron-config">
+                <div class="cron-section">
+                    <h5>全局配置</h5>
+                    <div class="cron-form">
+                        <label>Cron表达式: <input type="text" id="globalCron" placeholder="*/30 * * * * *"></label>
+                        <div class="muted" style="font-size:12px;margin-bottom:6px;">
+                            仅支持 <b>node-cron</b> 格式（5或6字段，不能包含<code>?</code>），如：<br>
+                            <code>*/30 * * * * *</code>（每30秒），<code>0 8 * * *</code>（每天8点）<br>
+                            <span style="color:#e57373">不要输入带<code>?</code>的表达式！</span>
+                        </div>
+                        <label>消息内容: <input type="text" id="globalMessage" placeholder="定时消息"></label>
+                        <label>目标QQ: <input type="text" id="globalTargetQQ" placeholder="123456789"></label>
+                        <button class="btn" onclick="saveGlobalCron()">保存全局配置</button>
+                    </div>
+                </div>
+                <div class="cron-section">
+                    <h5>群单独配置</h5>
+                    <div id="group-cron-list" class="group-list muted">加载中...</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -470,7 +576,162 @@
                 if (groupsEl) groupsEl.innerText = '加载中...';
                 if (candEl) candEl.innerText = '尚未扫描';
                 fetchGroups();
+                loadCronConfig();
             }
+
+            // 加载cron配置
+            async function loadCronConfig() {
+                try {
+                    const resolved = await resolveApiBase();
+                    const res = await authFetch(resolved.base + '/config');
+                    if (!res.ok) return;
+
+                    const json = await res.json();
+                    if (json && json.code === 0) {
+                        const config = json.data || {};
+                        document.getElementById('globalCron').value = config.globalCron || '';
+                        document.getElementById('globalMessage').value = config.globalMessage || '';
+                        document.getElementById('globalTargetQQ').value = config.globalTargetQQ || '';
+                    }
+                } catch (e) {
+                    console.error('加载全局配置失败:', e);
+                }
+
+                // 加载群cron配置
+                loadGroupCronConfigs();
+            }
+
+            // 加载群cron配置
+            async function loadGroupCronConfigs() {
+                try {
+                    const resolved = await resolveApiBase();
+                    const groupsRes = await authFetch(resolved.base + '/groups');
+                    if (!groupsRes.ok) return;
+
+                    const groupsJson = await groupsRes.json();
+                    if (!groupsJson || groupsJson.code !== 0 || !Array.isArray(groupsJson.data)) return;
+
+                    const groupRows = await Promise.all(groupsJson.data.map(async (g) => {
+                        const groupId = String(g.group_id);
+                        let cronConfig = {};
+                        try {
+                            const cronRes = await authFetch(resolved.base + `/groups/${encodeURIComponent(groupId)}/cron`);
+                            if (cronRes.ok) {
+                                const cronJson = await cronRes.json();
+                                if (cronJson && cronJson.code === 0) {
+                                    cronConfig = cronJson.data || {};
+                                }
+                            }
+                        } catch (e) {
+                            console.error(`加载群 ${groupId} cron配置失败:`, e);
+                        }
+
+                        return `<div class="group-cron-row">
+                            <div class="group-cron-info">
+                                <span class="group-cron-title">${escapeHtml(g.group_name || groupId)}</span>
+                                <span class="muted" style="font-size:13px">ID: ${groupId}</span>
+                            </div>
+                            <div class="group-cron-form">
+                                <label style="display:flex;align-items:center;gap:4px">
+                                    <input type="checkbox" data-group-id="${groupId}" ${cronConfig.enabled ? 'checked' : ''} onchange="onToggleGroupCron(this)">
+                                    <span style="font-size:13px">启用</span>
+                                </label>
+                                <input type="text" data-group-id="${groupId}" data-field="cron" placeholder="cron表达式" value="${escapeHtml(cronConfig.cron || '')}" style="width:100px">
+                                <input type="text" data-group-id="${groupId}" data-field="message" placeholder="消息内容" value="${escapeHtml(cronConfig.message || '')}" style="width:120px">
+                                <button class="btn" onclick="saveGroupCron('${groupId}')" style="padding:6px 12px;font-size:13px">保存</button>
+                            </div>
+                        </div>`;
+                    }));
+
+                    document.getElementById('group-cron-list').innerHTML = groupRows.join('');
+                } catch (e) {
+                    document.getElementById('group-cron-list').innerText = '加载群配置失败: ' + e.message;
+                }
+            }
+
+            // 保存全局cron配置
+            window.saveGlobalCron = async function () {
+                const cron = document.getElementById('globalCron').value;
+                const message = document.getElementById('globalMessage').value;
+                const targetQQ = document.getElementById('globalTargetQQ').value;
+
+                try {
+                    const resolved = await resolveApiBase();
+                    const res = await authFetch(resolved.base + '/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            globalCron: cron,
+                            globalMessage: message,
+                            globalTargetQQ: targetQQ
+                        })
+                    });
+
+                    if (res.ok) {
+                        alert('全局配置保存成功');
+                    } else {
+                        alert('保存失败: HTTP ' + res.status);
+                    }
+                } catch (e) {
+                    alert('网络错误: ' + e.message);
+                }
+            };
+
+            // 切换群cron启用状态
+            window.onToggleGroupCron = async function (el) {
+                const groupId = el.getAttribute('data-group-id');
+                const enabled = el.checked;
+
+                try {
+                    const resolved = await resolveApiBase();
+                    const res = await authFetch(resolved.base + `/groups/${encodeURIComponent(groupId)}/cron`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enabled })
+                    });
+
+                    if (!res.ok) {
+                        alert('更新失败: HTTP ' + res.status);
+                        el.checked = !enabled;
+                    }
+                } catch (e) {
+                    alert('网络错误: ' + e.message);
+                    el.checked = !enabled;
+                }
+            };
+
+            // 保存群cron配置
+            window.saveGroupCron = async function (groupId) {
+                const row = document.querySelector(`[data-group-id="${groupId}"].group-cron-row`);
+                if (!row) return;
+
+                const cronInput = row.querySelector(`input[data-field="cron"]`);
+                const messageInput = row.querySelector(`input[data-field="message"]`);
+                const targetQQInput = row.querySelector(`input[data-field="targetQQ"]`);
+
+                const config = {
+                    cron: cronInput ? cronInput.value : '',
+                    message: messageInput ? messageInput.value : '',
+                    targetQQ: targetQQInput ? targetQQInput.value : ''
+                };
+
+                try {
+                    const resolved = await resolveApiBase();
+                    const res = await authFetch(resolved.base + `/groups/${encodeURIComponent(groupId)}/cron`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(config)
+                    });
+
+                    if (res.ok) {
+                        alert('群配置保存成功');
+                    } else {
+                        alert('保存失败: HTTP ' + res.status);
+                    }
+                } catch (e) {
+                    alert('网络错误: ' + e.message);
+                }
+            };
 
             // 初始化
             refresh();

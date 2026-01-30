@@ -4,14 +4,6 @@
         "module": "ESNext",
         "moduleResolution": "bundler",
         "baseUrl": ".",
-        "paths": {
-            "napcat-types": [
-                "src/types/napcat-types-proxy.ts"
-            ],
-            "napcat-types/*": [
-                "src/types/napcat-types-proxy.ts"
-            ]
-        },
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,

@@ -1,8 +1,10 @@
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
 import { defineConfig } from 'vite';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import { builtinModules } from 'module';
-import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const nodeModules = [
     ...builtinModules,
@@ -27,63 +29,19 @@ export default defineConfig({
             output: {
                 inlineDynamicImports: true,
             },
+            plugins: [
+                {
+                    name: 'fix-dirname',
+                    transform(code, id) {
+                        if (id.includes('node-cron')) {
+                            return code.replace(/__dirname/g, 'process.cwd()');
+                        }
+                        return code;
+                    }
+                }
+            ]
         },
         outDir: 'dist',
-        emptyDirBeforeWrite: true,
     },
-    plugins: [nodeResolve(), copyAssetsPlugin()],
+    plugins: [nodeResolve()],
 });
-
-function copyAssetsPlugin() {
-    return {
-        name: 'copy-assets-to-dist',
-        writeBundle() {
-            try {
-                const distDir = resolve(__dirname, 'dist');
-                const packageJsonSrc = resolve(__dirname, 'package.json');
-                const webuiSrc = resolve(__dirname, 'src', 'webui');
-
-                // ensure dist exists
-                if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true });
-
-                // copy package.json into dist
-                try {
-                    if (fs.existsSync(packageJsonSrc)) {
-                        const packageJsonDest = resolve(distDir, 'package.json');
-                        fs.copyFileSync(packageJsonSrc, packageJsonDest);
-                        console.log(`[copy-assets-to-dist] copied package.json to ${packageJsonDest}`);
-                    }
-                } catch (err) {
-                    console.warn('[copy-assets-to-dist] failed to copy package.json:', err);
-                }
-
-                // copy webui directory into dist/webui
-                try {
-                    if (fs.existsSync(webuiSrc)) {
-                        const destWebui = resolve(distDir, 'webui');
-                        copyDirRecursive(webuiSrc, destWebui);
-                        console.log(`[copy-assets-to-dist] copied webui to ${destWebui}`);
-                    }
-                } catch (err) {
-                    console.warn('[copy-assets-to-dist] failed to copy webui:', err);
-                }
-            } catch (e) {
-                console.error('[copy-assets-to-dist] error:', e);
-            }
-        }
-    };
-}
-
-function copyDirRecursive(src: string, dest: string): void {
-    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-    const entries = fs.readdirSync(src, { withFileTypes: true });
-    for (const entry of entries) {
-        const srcPath = resolve(src, entry.name);
-        const destPath = resolve(dest, entry.name);
-        if (entry.isDirectory()) {
-            copyDirRecursive(srcPath, destPath);
-        } else {
-            fs.copyFileSync(srcPath, destPath);
-        }
-    }
-}
