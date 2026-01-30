@@ -10,7 +10,7 @@ import { loadConfig, saveConfig, getConfig, updateConfigField, setGroupWhitelist
 import { handleMessage } from './handlers/message-handler';
 import { getGroupsWithPermissions } from './services/group-service';
 import { runScanForGroup, getLastScanResults, startScheduler, stopScheduler } from './services/cleanup-service';
-import { startGlobalCronJob, startGroupCronJob, stopAllCronJobs, reloadAllCronJobs, getCronJobStatus } from './services/cron-service';
+import { startGlobalCronJob, startGroupCronJob, stopAllCronJobs, reloadAllCronJobs, getCronJobStatus, isValidCronExpression } from './services/cron-service';
 
 // 导出框架期望的变量名，框架在加载模块时会读取此导出用于展示配置 UI
 export let plugin_config_ui: PluginConfigSchema = [];
@@ -127,6 +127,52 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             ctx.router.post('/config', async (req: any, res: any) => {
                 try {
                     const newCfg = req.body || {};
+                    // 输入校验
+                    const errors: string[] = [];
+
+                    // 全局cron校验
+                    if (newCfg.globalCron !== undefined && newCfg.globalCron !== null && String(newCfg.globalCron).trim() !== '') {
+                        if (!isValidCronExpression(String(newCfg.globalCron))) {
+                            errors.push('globalCron: 无效的 cron 表达式（仅支持 node-cron，5 或 6 字段，不能包含 ?）');
+                        }
+                    }
+
+                    // 已移除 globalTargetQQ: 通知将直接发送到群内
+
+                    // 全局 inactiveDays 校验（可选，若提供须为 >=1 的整数）
+                    if (newCfg.inactiveDays !== undefined && newCfg.inactiveDays !== null && newCfg.inactiveDays !== '') {
+                        const v = Number(newCfg.inactiveDays);
+                        if (!Number.isInteger(v) || v < 1) errors.push('inactiveDays: 必须为大于等于 1 的整数');
+                    }
+
+                    // 群配置校验
+                    if (newCfg.groupConfigs !== undefined && newCfg.groupConfigs !== null) {
+                        if (typeof newCfg.groupConfigs !== 'object') {
+                            errors.push('groupConfigs: 必须为对象，键为群 ID');
+                        } else {
+                            for (const [gid, gc] of Object.entries(newCfg.groupConfigs || {})) {
+                                if (!gid) continue;
+                                if (gc && typeof gc === 'object') {
+                                    if (gc.cron !== undefined && gc.cron !== null && String(gc.cron).trim() !== '') {
+                                        if (!isValidCronExpression(String(gc.cron))) {
+                                            errors.push(`groupConfigs.${gid}.cron: 无效的 cron 表达式`);
+                                        }
+                                    }
+                                    if (gc.inactiveDays !== undefined && gc.inactiveDays !== null && gc.inactiveDays !== '') {
+                                        const iv = Number(gc.inactiveDays);
+                                        if (!Number.isInteger(iv) || iv < 1) errors.push(`groupConfigs.${gid}.inactiveDays: 必须为大于等于 1 的整数`);
+                                    }
+                                } else {
+                                    errors.push(`groupConfigs.${gid}: 必须为对象`);
+                                }
+                            }
+                        }
+                    }
+
+                    if (errors.length > 0) {
+                        return res.status(400).json({ code: -1, message: '配置校验失败', errors });
+                    }
+
                     // 保存并持久化
                     await saveConfig(ctx, { ...getConfig(), ...newCfg });
                     // 重新加载定时任务

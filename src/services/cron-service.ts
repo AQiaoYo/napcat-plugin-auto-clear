@@ -9,7 +9,7 @@ const activeCronJobs: Map<string, cron.ScheduledTask> = new Map();
 /**
  * 验证cron表达式是否有效
  */
-function isValidCronExpression(cronExpression: string): boolean {
+export function isValidCronExpression(cronExpression: string): boolean {
     if (!cronExpression || typeof cronExpression !== 'string') {
         return false;
     }
@@ -43,8 +43,8 @@ function getValidCronExpression(cronExpression: string): string {
 export function startGlobalCronJob(ctx: NapCatPluginContext) {
     const config = getConfig();
 
-    if (!config.enabled || !config.globalCron || !config.globalTargetQQ) {
-        ctx.logger?.info('全局定时任务未启用或配置不完整');
+    if (!config.enabled || !config.globalCron) {
+        ctx.logger?.info('全局定时任务未启用或未配置 globalCron');
         return;
     }
 
@@ -54,7 +54,7 @@ export function startGlobalCronJob(ctx: NapCatPluginContext) {
         ctx.logger?.warn(`无效的cron表达式 "${config.globalCron}"，使用默认值 "${validCron}"`);
     }
 
-    ctx.logger?.info(`准备启动全局定时任务，cron: "${validCron}", targetQQ: "${config.globalTargetQQ}"`);
+    ctx.logger?.info(`准备启动全局定时任务，cron: "${validCron}"`);
 
     try {
         // 停止已存在的全局任务
@@ -84,14 +84,12 @@ export function startGroupCronJob(ctx: NapCatPluginContext, groupId: string) {
 
     // 使用群配置或回退到全局配置
     const cronExpression = groupConfig.cron || config.globalCron || '';
-    const message = groupConfig.message || config.globalMessage || '';
-    const targetQQ = groupConfig.targetQQ || config.globalTargetQQ || '';
 
     // 验证cron表达式
     const validCron = getValidCronExpression(cronExpression);
 
-    if (!validCron || !targetQQ) {
-        ctx.logger?.info(`群 ${groupId} 定时任务配置不完整或cron表达式无效`);
+    if (!validCron) {
+        ctx.logger?.info(`群 ${groupId} 定时任务未启用或cron表达式无效`);
         return;
     }
 
@@ -104,7 +102,7 @@ export function startGroupCronJob(ctx: NapCatPluginContext, groupId: string) {
         stopCronJob(`group_${groupId}`);
 
         const job = cron.schedule(validCron, async () => {
-            await executeGroupCronTask(ctx, groupId, message, targetQQ);
+            await executeGroupCronTask(ctx, groupId);
         });
 
         activeCronJobs.set(`group_${groupId}`, job);
@@ -163,38 +161,25 @@ export function reloadAllCronJobs(ctx: NapCatPluginContext) {
 async function executeGlobalCronTask(ctx: NapCatPluginContext) {
     const config = getConfig();
 
-    if (!config.globalTargetQQ || !config.globalMessage) {
-        return;
-    }
+    // 全局定时任务触发时，遍历所有群配置并在各群内发送扫描结果（dry-run 风格），不再使用私聊通知
+    if (!config.groupConfigs) return;
 
-    try {
-        await ctx.actions.call('send_private_msg', {
-            user_id: config.globalTargetQQ,
-            message: `[全局定时任务] ${config.globalMessage}`
-        }, ctx.adapterName, ctx.pluginManager.config);
-
-        ctx.logger?.info(`全局定时任务执行成功，发送消息到 ${config.globalTargetQQ}`);
-    } catch (error) {
-        ctx.logger?.error('执行全局定时任务失败:', error);
+    for (const groupId of Object.keys(config.groupConfigs)) {
+        try {
+            const gc = config.groupConfigs[groupId] || {};
+            if (!gc.enabled) continue;
+            await executeGroupCronTask(ctx, groupId);
+        } catch (e) {
+            ctx.logger?.error(`全局定时任务处理群 ${groupId} 时出错:`, e);
+        }
     }
 }
 
 /**
  * 执行群定时任务
  */
-async function executeGroupCronTask(ctx: NapCatPluginContext, groupId: string, message: string, targetQQ: string) {
+async function executeGroupCronTask(ctx: NapCatPluginContext, groupId: string) {
     try {
-        // 优先从持久化配置读取全局目标QQ，回退到运行时插件配置
-        const cfg = getConfig();
-        const globalTargetQQ = String(cfg.globalTargetQQ || ((ctx.pluginManager as any)?.config?.globalTargetQQ) || '').trim();
-
-        // 验证目标QQ（如果未配置或无效，则回退为群内通知）
-        let userIdNum = Number(globalTargetQQ);
-        const sendToPrivate = Number.isFinite(userIdNum) && userIdNum > 0;
-        if (!sendToPrivate) {
-            ctx.logger?.warn(`群 ${groupId} 未配置有效的 globalTargetQQ，将回退为群内通知`);
-        }
-
         // 获取最新扫描结果
         const { runScanForGroup } = await import('./cleanup-service');
         const candidates = await runScanForGroup(ctx, groupId);
@@ -210,26 +195,18 @@ async function executeGroupCronTask(ctx: NapCatPluginContext, groupId: string, m
                 msg += `……等${candidates.length}人`;
             }
         }
-        if (sendToPrivate) {
-            // 发送私聊到 globalTargetQQ
-            await ctx.actions.call('send_private_msg', {
-                user_id: userIdNum,
-                message: msg
-            }, ctx.adapterName, ctx.pluginManager.config);
-            ctx.logger?.info(`群 ${groupId} 定时任务执行成功，发送私聊到 ${globalTargetQQ}`);
-        } else {
-            // 回退为群内通知
-            const groupIdNum = Number(groupId);
-            if (!Number.isFinite(groupIdNum) || groupIdNum <= 0) {
-                ctx.logger?.error(`群 ${groupId} 定时任务失败: 无效的 groupId，且未配置有效 globalTargetQQ`);
-                return;
-            }
-            await ctx.actions.call('send_group_msg', {
-                group_id: groupIdNum,
-                message: msg
-            }, ctx.adapterName, ctx.pluginManager.config);
-            ctx.logger?.info(`群 ${groupId} 定时任务执行成功，发送群消息`);
+
+        // 直接在群内发送通知（不进行私聊）
+        const groupIdNum = Number(groupId);
+        if (!Number.isFinite(groupIdNum) || groupIdNum <= 0) {
+            ctx.logger?.error(`群 ${groupId} 定时任务失败: 无效的 groupId`);
+            return;
         }
+        await ctx.actions.call('send_group_msg', {
+            group_id: groupIdNum,
+            message: msg
+        }, ctx.adapterName, ctx.pluginManager.config);
+        ctx.logger?.info(`群 ${groupId} 定时任务执行成功，发送群消息`);
     } catch (error) {
         ctx.logger?.error(`执行群 ${groupId} 定时任务失败:`, error);
     }

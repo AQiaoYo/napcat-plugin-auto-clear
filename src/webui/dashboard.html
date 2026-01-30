@@ -392,7 +392,9 @@
             <p class="muted">安全群成员清理 · 白名单管理</p>
             <div class="actions">
                 <button class="btn" onclick="refresh()">刷新</button>
+                <button class="btn" onclick="saveAllConfig()">保存所有配置</button>
             </div>
+            <div id="save-result" style="margin-top:10px"></div>
         </div>
         <div class="card">
             <h4>机器人所在群与权限</h4>
@@ -414,9 +416,7 @@
                             <code>*/30 * * * * *</code>（每30秒），<code>0 8 * * *</code>（每天8点）<br>
                             <span style="color:#e57373">不要输入带<code>?</code>的表达式！</span>
                         </div>
-                        <label>消息内容: <input type="text" id="globalMessage" placeholder="定时消息"></label>
-                        <label>目标QQ: <input type="text" id="globalTargetQQ" placeholder="123456789"></label>
-                        <button class="btn" onclick="saveGlobalCron()">保存全局配置</button>
+                        <label>默认不活跃天数: <input type="number" id="globalInactiveDays" min="1" placeholder="30"></label>
                     </div>
                 </div>
                 <div class="cron-section">
@@ -590,8 +590,7 @@
                     if (json && json.code === 0) {
                         const config = json.data || {};
                         document.getElementById('globalCron').value = config.globalCron || '';
-                        document.getElementById('globalMessage').value = config.globalMessage || '';
-                        document.getElementById('globalTargetQQ').value = config.globalTargetQQ || '';
+                        document.getElementById('globalInactiveDays').value = config.inactiveDays || '';
                     }
                 } catch (e) {
                     console.error('加载全局配置失败:', e);
@@ -639,7 +638,7 @@
                                 <input type="text" data-group-id="${groupId}" data-field="cron" placeholder="cron表达式" value="${escapeHtml(cronConfig.cron || '')}" style="width:100px">
                                 <input type="number" min="1" data-group-id="${groupId}" data-field="inactiveDays" placeholder="不活跃天数" value="${escapeHtml(cronConfig.inactiveDays || '')}" style="width:90px">
                                 <input type="text" data-group-id="${groupId}" data-field="message" placeholder="消息内容" value="${escapeHtml(cronConfig.message || '')}" style="width:120px">
-                                <button class="btn" onclick="saveGroupCron('${groupId}')" style="padding:6px 12px;font-size:13px">保存</button>
+                                <!-- 单独保存按钮已移除，使用顶部的"保存所有配置"统一保存 -->
                             </div>
                         </div>`;
                     }));
@@ -650,28 +649,73 @@
                 }
             }
 
-            // 保存全局cron配置
-            window.saveGlobalCron = async function () {
-                const cron = document.getElementById('globalCron').value;
-                const message = document.getElementById('globalMessage').value;
-                const targetQQ = document.getElementById('globalTargetQQ').value;
-
+            // 保存所有配置（全局 + 各群）
+            window.saveAllConfig = async function () {
                 try {
                     const resolved = await resolveApiBase();
+                    const globalCron = document.getElementById('globalCron').value;
+                    const globalInactiveDays = Number(document.getElementById('globalInactiveDays').value) || undefined;
+
+                    const groupRows = Array.from(document.querySelectorAll('.group-cron-row'));
+                    const groupConfigs = {};
+                    for (const row of groupRows) {
+                        const gid = row.querySelector('.group-cron-title')?.innerText || '';
+                        // ID text is like "Name (ID)"? Prefer data attribute
+                        const idMeta = row.querySelector('.muted');
+                        let groupId = '';
+                        if (idMeta) {
+                            const txt = idMeta.innerText || '';
+                            const m = txt.match(/ID:\s*(\d+)/);
+                            if (m) groupId = m[1];
+                        }
+                        if (!groupId) continue;
+
+                        const enabledEl = row.querySelector(`input[type=checkbox][data-group-id='${groupId}']`);
+                        const cronEl = row.querySelector(`input[data-group-id='${groupId}'][data-field='cron']`);
+                        const msgEl = row.querySelector(`input[data-group-id='${groupId}'][data-field='message']`);
+                        const inactiveEl = row.querySelector(`input[data-group-id='${groupId}'][data-field='inactiveDays']`);
+
+                        groupConfigs[groupId] = {
+                            enabled: enabledEl ? Boolean(enabledEl.checked) : false,
+                            cron: cronEl ? cronEl.value : undefined,
+                            message: msgEl ? msgEl.value : undefined,
+                            inactiveDays: inactiveEl && inactiveEl.value ? Number(inactiveEl.value) : undefined
+                        };
+                    }
+
+                    const body = {
+                        globalCron: globalCron,
+                        inactiveDays: globalInactiveDays,
+                        groupConfigs: groupConfigs
+                    };
+
+                    const resultEl = document.getElementById('save-result');
+                    resultEl.innerHTML = '';
+
                     const res = await authFetch(resolved.base + '/config', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            globalCron: cron,
-                            globalMessage: message,
-                            globalTargetQQ: targetQQ
-                        })
+                        body: JSON.stringify(body)
                     });
 
+                    // 尝试解析响应体（若非 JSON 则忽略解析错误）
+                    let resJson = null;
+                    try { resJson = await res.json(); } catch (e) { /* ignore */ }
+
                     if (res.ok) {
-                        alert('全局配置保存成功');
+                        resultEl.innerHTML = '<div style="color:var(--success-color);font-weight:600">配置已保存</div>';
+                        // reload configs to refresh UI
+                        loadCronConfig();
                     } else {
-                        alert('保存失败: HTTP ' + res.status);
+                        // 优先显示后端返回的 errors 字段（如果存在）
+                        if (resJson && Array.isArray(resJson.errors) && resJson.errors.length > 0) {
+                            const items = resJson.errors.map(e => `<li>${escapeHtml(String(e))}</li>`).join('');
+                            resultEl.innerHTML = `<div style="color:#e53e3e"><strong>保存失败：</strong><ul style="margin:6px 0 0 18px">${items}</ul></div>`;
+                        } else if (resJson && resJson.message) {
+                            resultEl.innerHTML = `<div style="color:#e53e3e">保存失败: ${escapeHtml(String(resJson.message))}</div>`;
+                        } else {
+                            resultEl.innerHTML = `<div style="color:#e53e3e">保存失败: HTTP ${res.status}</div>`;
+                        }
                     }
                 } catch (e) {
                     alert('网络错误: ' + e.message);
@@ -708,12 +752,10 @@
 
                 const cronInput = row.querySelector(`input[data-field="cron"]`);
                 const messageInput = row.querySelector(`input[data-field="message"]`);
-                const targetQQInput = row.querySelector(`input[data-field="targetQQ"]`);
 
                 const config = {
                     cron: cronInput ? cronInput.value : '',
-                    message: messageInput ? messageInput.value : '',
-                    targetQQ: targetQQInput ? targetQQInput.value : ''
+                    message: messageInput ? messageInput.value : ''
                 };
 
                 try {

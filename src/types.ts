@@ -12,9 +12,7 @@ export interface PluginConfig {
     // globalCron - 全局cron表达式，默认每天早上8点
     globalCron?: string;
     // globalMessage - 全局定时消息内容
-    globalMessage?: string;
-    // globalTargetQQ - 全局目标QQ号
-    globalTargetQQ?: string;
+    // NOTE: globalMessage/globalTargetQQ 已移除：通知直接返回到群内
     // inactiveDays - 默认不活跃天数
     inactiveDays?: number;
     // groupConfigs - 按群的单独配置
