@@ -51,7 +51,34 @@
             --accent-strong: hsl(var(--heroui-primary-700, 339 90% 30%));
             --accent-light: hsl(var(--heroui-primary-100, 340 91.84% 90.39%));
             --success-color: hsl(var(--heroui-success-500, 146 62.45% 55.1%));
-    }
+        }
+
+        /* 明确处理 dark/light 主题覆盖（NapCat 会在根元素或 body 上设置 .dark/.light 或 data-theme） */
+        .dark,
+        [data-theme="dark"] {
+            --bg-primary: hsl(var(--heroui-background, 0 0% 6%));
+            --bg-card: hsl(var(--heroui-content2, 240 5.2% 15.88%));
+            --bg-item: hsl(var(--heroui-content3, 240 5.26% 26.08%));
+            --text-primary: hsl(var(--heroui-foreground, 210 5.56% 92.94%));
+            --text-secondary: hsl(var(--heroui-content2-foreground, 240 4.76% 95.88%));
+            --border-color: hsl(var(--heroui-divider, 0 0% 100%));
+            --accent-color: hsl(var(--heroui-primary-500, 339 90% 60%));
+            --accent-strong: hsl(var(--heroui-primary-300, 339 86.54% 40.78%));
+            --accent-light: hsl(var(--heroui-primary-800, 340 91.84% 90.39%));
+        }
+
+        .light,
+        [data-theme="light"] {
+            --bg-primary: hsl(var(--heroui-background, 0 0% 100%));
+            --bg-card: hsl(var(--heroui-content2, 240 3.7% 90%));
+            --bg-item: hsl(var(--heroui-content3, 240 5.26% 80%));
+            --text-primary: hsl(var(--heroui-foreground, 210 5.56% 7.06%));
+            --text-secondary: hsl(var(--heroui-content2-foreground, 0 0% 10%));
+            --border-color: hsl(var(--heroui-divider, 0 0% 0%));
+            --accent-color: hsl(var(--heroui-primary-500, 339 90% 60%));
+            --accent-strong: hsl(var(--heroui-primary-700, 339 90% 30%));
+            --accent-light: hsl(var(--heroui-primary-100, 340 91.84% 90.39%));
+        }
 
         .card {
             background: var(--bg-card);
