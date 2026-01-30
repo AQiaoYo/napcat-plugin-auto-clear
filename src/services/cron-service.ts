@@ -180,20 +180,17 @@ async function executeGlobalCronTask(ctx: NapCatPluginContext) {
  */
 async function executeGroupCronTask(ctx: NapCatPluginContext, groupId: string) {
     try {
-        // 获取最新扫描结果
-        const { runScanForGroup } = await import('./cleanup-service');
-        const candidates = await runScanForGroup(ctx, groupId);
+        // 现在不再依赖 runScanForGroup 进行扫描；直接使用配置中的 message 字段发送通知
+        const config = getConfig();
+        const groupConfig = config.groupConfigs?.[groupId] || {} as GroupCronConfig;
+
         let msg = '';
-        if (candidates.length === 0) {
-            msg = '本群暂无长时间未发言成员。';
+        if (groupConfig.message && String(groupConfig.message).trim() !== '') {
+            msg = String(groupConfig.message);
         } else {
-            msg = `以下成员长时间未发言（超过阈值）：\n`;
-            candidates.slice(0, 10).forEach((u, idx) => {
-                msg += `${idx + 1}. ${u.nickname || u.user_id}（${u.user_id}） 不活跃${u.inactive_days}天\n`;
-            });
-            if (candidates.length > 10) {
-                msg += `……等${candidates.length}人`;
-            }
+            // 如果没有任何配置消息，则记录并跳过发送，避免发送空消息
+            ctx.logger?.info(`群 ${groupId} 定时任务触发，但无配置消息，已跳过发送`);
+            return;
         }
 
         // 直接在群内发送通知（不进行私聊）
@@ -202,6 +199,7 @@ async function executeGroupCronTask(ctx: NapCatPluginContext, groupId: string) {
             ctx.logger?.error(`群 ${groupId} 定时任务失败: 无效的 groupId`);
             return;
         }
+
         await ctx.actions.call('send_group_msg', {
             group_id: groupIdNum,
             message: msg

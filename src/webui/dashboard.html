@@ -1,802 +1,394 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>NapCat 插件仪表盘</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NapCat 插件仪表盘 · 自动清理</title>
     <style>
         :root {
-            /* Prefer the host UI theme variables (heroui); fall back to plugin defaults */
-            --bg-primary: var(--heroui-background, rgba(255, 255, 255, 0.4));
-            --bg-secondary: var(--heroui-content1, rgba(255, 255, 255, 0.6));
-            --bg-card: var(--heroui-content2, rgba(255, 255, 255, 0.5));
-            --bg-item: var(--heroui-content3, rgba(0, 0, 0, 0.03));
-            --text-primary: var(--heroui-foreground, #1a1a1a);
-            --text-secondary: var(--heroui-content2-foreground, #666);
-            --text-muted: var(--heroui-foreground-300, #999);
-            --border-color: var(--heroui-divider, rgba(0, 0, 0, 0.06));
-            --accent-color: var(--heroui-primary, #52525b);
-            --accent-light: var(--heroui-primary-100, rgba(82, 82, 91, 0.1));
-            --success-color: var(--heroui-success, #17c964);
+            --bg: #fff;
+            --card: #f8f9fb;
+            --muted: #6b7280;
+            --accent: #6b46c1;
+            --danger: #e11d48
         }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-primary: rgba(0, 0, 0, 0.2);
-                --bg-secondary: rgba(0, 0, 0, 0.3);
-                --bg-card: rgba(255, 255, 255, 0.05);
-                --bg-item: rgba(255, 255, 255, 0.05);
-                --text-primary: #f5f5f5;
-                --text-secondary: #a1a1a1;
-                --text-muted: #666;
-                --border-color: rgba(255, 255, 255, 0.1);
-                --accent-color: #d1d5db;
-                --accent-light: rgba(82, 82, 91, 0.25);
-            }
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: var(--bg);
+            font-family: system-ui, Segoe UI, Roboto, 'Noto Sans', Helvetica, Arial
         }
 
-        :root {
-            /* Prefer the host UI theme variables (heroui); fall back to plugin defaults.
-               The heroui variables in NapCat are stored as H S% L% components, so use hsl(var(--heroui-...)). */
-            --bg-primary: hsl(var(--heroui-background, 0 0% 98%));
-            --bg-secondary: hsl(var(--heroui-content1, 0 0% 96%));
-            --bg-card: hsl(var(--heroui-content2, 0 0% 100%));
-            --bg-item: hsl(var(--heroui-content3, 0 0% 96%));
-            --text-primary: hsl(var(--heroui-foreground, 210 5.56% 7.06%));
-            --text-secondary: hsl(var(--heroui-content2-foreground, 210 5.56% 40%));
-            --text-muted: hsl(var(--heroui-foreground-300, 240 5.2% 33.92%));
-            --border-color: hsl(var(--heroui-divider, 0 0% 90%));
-            --accent-color: hsl(var(--heroui-primary-500, 339 90% 60%));
-            --accent-strong: hsl(var(--heroui-primary-700, 339 90% 30%));
-            --accent-light: hsl(var(--heroui-primary-100, 340 91.84% 90.39%));
-            --success-color: hsl(var(--heroui-success-500, 146 62.45% 55.1%));
+        .wrap {
+            max-width: 1200px;
+            margin: 14px auto;
+            padding: 12px
         }
 
-        /* 明确处理 dark/light 主题覆盖（NapCat 会在根元素或 body 上设置 .dark/.light 或 data-theme） */
-        .dark,
-        [data-theme="dark"] {
-            --bg-primary: hsl(var(--heroui-background, 0 0% 6%));
-            --bg-card: hsl(var(--heroui-content2, 240 5.2% 15.88%));
-            --bg-item: hsl(var(--heroui-content3, 240 5.26% 26.08%));
-            --text-primary: hsl(var(--heroui-foreground, 210 5.56% 92.94%));
-            --text-secondary: hsl(var(--heroui-content2-foreground, 240 4.76% 95.88%));
-            --border-color: hsl(var(--heroui-divider, 0 0% 100%));
-            --accent-color: hsl(var(--heroui-primary-500, 339 90% 60%));
-            --accent-strong: hsl(var(--heroui-primary-300, 339 86.54% 40.78%));
-            --accent-light: hsl(var(--heroui-primary-800, 340 91.84% 90.39%));
+        .top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px
         }
 
-        .light,
-        [data-theme="light"] {
-            --bg-primary: hsl(var(--heroui-background, 0 0% 100%));
-            --bg-card: hsl(var(--heroui-content2, 240 3.7% 90%));
-            --bg-item: hsl(var(--heroui-content3, 240 5.26% 80%));
-            --text-primary: hsl(var(--heroui-foreground, 210 5.56% 7.06%));
-            --text-secondary: hsl(var(--heroui-content2-foreground, 0 0% 10%));
-            --border-color: hsl(var(--heroui-divider, 0 0% 0%));
-            --accent-color: hsl(var(--heroui-primary-500, 339 90% 60%));
-            --accent-strong: hsl(var(--heroui-primary-700, 339 90% 30%));
-            --accent-light: hsl(var(--heroui-primary-100, 340 91.84% 90.39%));
+        .brand {
+            display: flex;
+            gap: 12px;
+            align-items: center
+        }
+
+        .brand .icon {
+            font-size: 22px
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px
+        }
+
+        button {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            background: #fff;
+            cursor: pointer
+        }
+
+        button.primary {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent)
+        }
+
+        .layout {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px
+        }
+
+        .left {
+            flex: 1;
+            min-width: 0
         }
 
         .card {
-            background: var(--bg-card);
-            border-radius: 12px;
-            box-shadow: 0 6px 18px -8px var(--accent-light);
-            padding: 18px 18px;
-            margin-bottom: 20px;
-            border: 1px solid var(--border-color);
+            background: var(--card);
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #e6e9ef
         }
 
-        .card h3,
-        .card h4 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            font-weight: 600;
+        .card+.card {
+            margin-top: 12px
         }
 
-        .muted {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
-
-        .actions {
-            margin-top: 12px;
+        .search {
             display: flex;
-            gap: 10px;
-            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px
         }
 
-        .btn {
-            padding: 8px 16px;
-            border-radius: 9px;
-            border: none;
-            background: var(--accent-color);
-            color: #fff;
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            box-shadow: 0 1px 6px 0 var(--accent-light);
-            transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+        input[type=text],
+        input[type=number] {
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #dfe4ee;
+            width: 100%
         }
 
-        .btn:focus {
-            outline: 2px solid rgba(99, 102, 241, 0.18);
-            outline-offset: 2px;
-        }
-
-        .btn.secondary {
-            background: transparent;
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            box-shadow: none;
-        }
-
-        .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 10px 0 rgba(99, 102, 241, 0.12);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-            filter: brightness(0.94);
-        }
-
-        /* 在暗色主题下使用更强的强调色并加强交互反馈 */
-        .dark .btn,
-        [data-theme="dark"] .btn {
-            background: var(--accent-strong);
-            color: var(--text-primary);
-            box-shadow: 0 4px 18px -6px rgba(0, 0, 0, 0.5);
-        }
-
-        .dark .btn:hover,
-        [data-theme="dark"] .btn:hover {
-            filter: brightness(1.08);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 22px -6px rgba(0, 0, 0, 0.55);
-        }
-
-        .dark .btn:active,
-        [data-theme="dark"] .btn:active {
-            filter: brightness(0.88);
-            transform: translateY(0);
-        }
-
-        .group-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .group-row {
+        .group {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: var(--bg-item);
-            border-radius: 10px;
-            padding: 12px 14px;
-            box-shadow: 0 1px 6px 0 var(--accent-light);
-            transition: transform 0.12s, box-shadow 0.12s;
-        }
-
-        .group-row:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.06);
-        }
-
-        .group-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .group-title {
-            font-size: 16px;
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .group-meta {
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-top: 2px;
-        }
-
-        .group-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            align-items: flex-end;
-        }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 44px;
-            height: 24px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--bg-item);
-            border-radius: 24px;
-            transition: .3s;
-        }
-
-        .switch input:checked+.slider {
-            background: var(--accent-color);
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
+            padding: 10px;
+            border-radius: 8px;
             background: #fff;
-            border-radius: 50%;
-            transition: .3s;
-            box-shadow: 0 1px 4px 0 var(--accent-light);
+            margin-bottom: 8px
         }
 
-        .switch input:checked+.slider:before {
-            transform: translateX(20px);
+        .meta {
+            color: var(--muted);
+            font-size: 13px
         }
 
-        .candidate-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .candidate-row {
-            background: var(--bg-item);
-            border-radius: 10px;
-            padding: 10px 12px;
-            box-shadow: 0 1px 6px 0 var(--accent-light);
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .candidate-row .meta {
-            color: var(--text-secondary);
+        .small {
             font-size: 13px;
+            color: var(--muted)
         }
 
-        .empty-state {
-            text-align: center;
-            padding: 16px;
-            color: var(--text-secondary);
+        .sidebar {
+            width: 320px
         }
 
-        .cron-section {
-            margin-bottom: 20px;
+        .hint {
+            color: var(--muted);
+            font-size: 13px
         }
 
-        .cron-section h5 {
-            margin: 0 0 12px 0;
-            color: var(--text-primary);
-            font-size: 16px;
+        .candidates {
+            margin-top: 8px
         }
 
-        .cron-form {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .cron-form label {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            font-size: 14px;
-            color: var(--text-primary);
-        }
-
-        .cron-form input {
-            padding: 8px 12px;
-            border: 1px solid var(--border-color);
+        .candidate {
+            padding: 8px;
             border-radius: 6px;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 14px;
+            background: #fff;
+            margin-bottom: 6px
         }
 
-        .cron-form input:focus {
-            outline: 2px solid var(--accent-color);
-            outline-offset: 1px;
-        }
-
-        .group-cron-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: var(--bg-item);
-            border-radius: 10px;
-            padding: 12px 14px;
-            box-shadow: 0 1px 6px 0 var(--accent-light);
-            margin-bottom: 8px;
-        }
-
-        .group-cron-info {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .group-cron-title {
-            font-size: 16px;
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .group-cron-form {
+        .row {
             display: flex;
             gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
+            align-items: center
         }
 
-        .group-cron-form input {
-            padding: 6px 8px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 13px;
-            width: 120px;
-        }
-
-        .group-cron-form input:focus {
-            outline: 2px solid var(--accent-color);
-            outline-offset: 1px;
-        }
-
-        @media (max-width: 600px) {
-            .container {
-                max-width: 100%;
-                padding: 0 4px;
+        @media (max-width:900px) {
+            .layout {
+                flex-direction: column
             }
 
-            .card {
-                padding: 16px 6px;
-            }
-
-            .group-row,
-            .candidate-row {
-                padding: 10px 6px;
+            .sidebar {
+                width: 100%
             }
         }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        <div class="card">
-            <h3>NapCat 插件仪表盘</h3>
-            <p class="muted">安全群成员清理 · 白名单管理</p>
-            <div class="actions">
-                <button class="btn" onclick="refresh()">刷新</button>
-                <button class="btn" onclick="saveAllConfig()">保存所有配置</button>
+    <div class="wrap">
+        <div class="top">
+            <div class="brand">
+                <div class="icon">🐱</div>
+                <div>
+                    <div style="font-weight:600">NapCat 插件 · 自动清理</div>
+                    <div class="small">白名单管理 · 定时扫描</div>
+                </div>
             </div>
-            <div id="save-result" style="margin-top:10px"></div>
+            <div class="controls">
+                <button id="refreshBtn">刷新</button>
+                <button id="saveBtn" class="primary">保存配置</button>
+            </div>
         </div>
-        <div class="card">
-            <h4>机器人所在群与权限</h4>
-            <div id="groups" class="group-list muted">加载中...</div>
-        </div>
-        <div class="card">
-            <h4>扫描候选（Dry-run）</h4>
-            <div id="candidates" class="candidate-list muted">尚未扫描</div>
-        </div>
-        <div class="card">
-            <h4>定时任务配置</h4>
-            <div id="cron-config">
-                <div class="cron-section">
-                    <h5>全局配置</h5>
-                    <div class="cron-form">
-                        <label>Cron表达式: <input type="text" id="globalCron" placeholder="*/30 * * * * *"></label>
-                        <div class="muted" style="font-size:12px;margin-bottom:6px;">
-                            仅支持 <b>node-cron</b> 格式（5或6字段，不能包含<code>?</code>），如：<br>
-                            <code>*/30 * * * * *</code>（每30秒），<code>0 8 * * *</code>（每天8点）<br>
-                            <span style="color:#e57373">不要输入带<code>?</code>的表达式！</span>
+
+        <div class="layout">
+            <div class="left">
+                <div class="card" id="groupsCard">
+                    <div class="row" style="justify-content:space-between;align-items:center">
+                        <strong>机器人所在群</strong>
+                        <div class="small hint" id="status">加载中…</div>
+                    </div>
+                    <div class="search" style="margin-top:8px">
+                        <input id="q" type="text" placeholder="按群名或群号搜索" />
+                        <select id="filter">
+                            <option value="all">全部</option>
+                        </select>
+                    </div>
+                    <div id="groups" style="margin-top:6px">加载中...</div>
+                </div>
+
+                <!-- group detail modal -->
+                <div id="groupModal"
+                    style="display:none;position:fixed;left:0;top:0;right:0;bottom:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);z-index:999">
+                    <div
+                        style="background:#fff;border-radius:8px;padding:16px;min-width:320px;max-width:720px;margin:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <strong id="modalTitle">群设置</strong>
+                            <button onclick="closeGroupModal()">关闭</button>
                         </div>
-                        <label>默认不活跃天数: <input type="number" id="globalInactiveDays" min="1" placeholder="30"></label>
+                        <div style="margin-top:10px">
+                            <div class="small">群 ID: <span id="modalGroupId" class="small"></span></div>
+                            <label class="small" style="margin-top:8px">启用（此群的定时任务）</label>
+                            <input id="modalEnabled" type="checkbox" />
+                            <label class="small" style="margin-top:8px">Cron 表达式</label>
+                            <input id="modalCron" type="text" placeholder="cron 表达式（5 或 6 字段）" />
+                            <label class="small" style="margin-top:8px">不活跃天数</label>
+                            <input id="modalInactiveDays" type="number" min="1" />
+                            <label class="small" style="margin-top:8px">消息内容</label>
+                            <input id="modalMessage" type="text" />
+                        </div>
+                        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+                            <button onclick="closeGroupModal()">取消</button>
+                            <button class="primary" onclick="saveGroupFromModal()">保存</button>
+                        </div>
                     </div>
                 </div>
-                <div class="cron-section">
-                    <h5>群单独配置</h5>
-                    <div id="group-cron-list" class="group-list muted">加载中...</div>
+            </div>
+
+            <div class="sidebar">
+                <div class="card">
+                    <strong>定时任务 · 全局配置</strong>
+                    <div style="margin-top:8px" class="hint">node-cron（5 或 6 字段，不能包含 ?）</div>
+                    <div style="margin-top:8px">
+                        <label class="small">Cron 表达式</label>
+                        <input id="globalCron" type="text" placeholder="例如: 0 8 * * *" />
+                        <label class="small" style="margin-top:6px">默认不活跃天数</label>
+                        <input id="globalInactiveDays" type="number" min="1" placeholder="30" />
+                    </div>
                 </div>
+
+                <!-- 已将群单独配置整合至群列表的模态窗中，移除快速编辑面板 -->
             </div>
         </div>
     </div>
 
     <script>
         (function () {
-            const urlParams = new URLSearchParams(window.location.search);
+            const urlParams = new URLSearchParams(location.search);
             const token = urlParams.get('webui_token') || '';
 
-            // 尝试解析和探测正确的 API base
+            function authHeaders(h = {}) { if (token) h['Authorization'] = 'Bearer ' + token; return h }
+
             async function resolveApiBase() {
-                const candidates = [];
-
-                // 优先使用宿主注入的变量
-                if (window.__PLUGIN_NAME__) candidates.push(window.__PLUGIN_NAME__);
-
-                // 父窗口上可能也注入了插件名
-                try {
-                    if (window.parent && window.parent.__PLUGIN_NAME__) candidates.push(window.parent.__PLUGIN_NAME__);
-                } catch (e) {
-                    // 访问 parent 可能被同源策略阻止，忽略
-                }
-
-                // 从 location.pathname 取可能的 segment（兼容不同嵌套路径）
+                const tries = [];
+                if (window.__PLUGIN_NAME__) tries.push(window.__PLUGIN_NAME__);
+                try { if (window.parent && window.parent.__PLUGIN_NAME__) tries.push(window.parent.__PLUGIN_NAME__) } catch (e) { }
                 const segs = location.pathname.split('/').filter(Boolean);
-                if (segs.length >= 1) candidates.push(segs[segs.length - 1]);
-                if (segs.length >= 2) candidates.push(segs[segs.length - 2]);
-
-                // 常见默认名作为兜底
-                candidates.push('napcat-plugin-auto-clear', 'napcat-plugin-builtin', 'Plugin');
-
-                // 去重并移除空项
-                const uniq = [...new Set(candidates)].filter(Boolean);
-
-                for (const name of uniq) {
-                    const baseTry = '/api/Plugin/ext/' + name;
-                    try {
-                        const res = await authFetch(baseTry + '/status', { method: 'GET' });
-                        if (res.ok) {
-                            // 成功找到可用路由
-                            return { base: baseTry, tried: uniq };
-                        }
-                    } catch (e) {
-                        // 忽略网络错误，继续尝试下一个
-                    }
+                if (segs.length) tries.push(segs[segs.length - 1]);
+                tries.push('napcat-plugin-auto-clear');
+                for (const name of [...new Set(tries)]) {
+                    const base = '/api/Plugin/ext/' + name;
+                    try { const r = await fetch(base + '/status', { headers: authHeaders() }); if (r.ok) return base } catch (e) { }
                 }
-                // 都失败，返回第一个候选作为 base 并把尝试列表返回给前端用来显示诊断信息
-                return { base: '/api/Plugin/ext/' + (window.__PLUGIN_NAME__ || location.pathname.split('/').filter(Boolean).pop() || 'napcat-plugin-auto-clear'), tried: uniq };
+                return '/api/Plugin/ext/' + (window.__PLUGIN_NAME__ || 'napcat-plugin-auto-clear');
             }
 
-            async function authFetch(url, opts) {
-                const headers = (opts && opts.headers) || {};
-                if (token) headers['Authorization'] = 'Bearer ' + token;
-                const res = await fetch(url, { ...opts, headers });
-                return res;
-            }
+            function esc(s) { if (!s && s !== 0) return ''; return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') }
 
-            function escapeHtml(str) {
-                if (!str) return '';
-                return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            let API_BASE_P = resolveApiBase();
+
+            async function fetchJson(path, opts) { const base = await API_BASE_P; const res = await fetch(base + path, Object.assign({}, opts, { headers: Object.assign({ 'Content-Type': 'application/json' }, opts && opts.headers ? opts.headers : {}, authHeaders()) })); return res }
+
+            async function loadStatus() {
+                try {
+                    const res = await fetchJson('/status', { method: 'GET' });
+                    const j = await res.json();
+                    document.getElementById('status').innerText = j && j.code === 0 ? ('uptime: ' + (j.data?.uptimeFormatted || '')) : '已连接';
+                } catch (e) { document.getElementById('status').innerText = '无法连接'; }
             }
 
             async function fetchGroups() {
+                const el = document.getElementById('groups'); el.innerHTML = '加载中...';
                 try {
-                    const resolved = await resolveApiBase();
-                    const res = await authFetch(resolved.base + '/groups');
-                    if (!res.ok) {
-                        document.getElementById('groups').innerText = `获取群列表失败 (HTTP ${res.status}). 尝试的 candidates: ${resolved.tried.join(', ')}`;
-                        return;
-                    }
-                    const json = await res.json();
-                    if (json && json.code === 0 && Array.isArray(json.data)) {
-                        const arr = json.data;
-                        if (arr.length === 0) {
-                            document.getElementById('groups').innerText = '未加入任何群或无法获取群列表';
-                            return;
-                        }
-                        const rows = arr.map(g => {
-                            const id = String(g.group_id);
-                            const checked = g.whitelisted ? 'checked' : '';
-                            return `<div class="group-row">\n                            <div class="group-info">\n                                <span class="group-title">${escapeHtml(g.group_name || id)} <span class="muted">(${id})</span></span>\n                                <span class="group-meta">成员: ${g.member_count} · 角色: ${g.role} · 可踢人: ${g.canKick ? '是' : '否'} · 可禁言: ${g.canBan ? '是' : '否'}</span>\n                            </div>\n                            <div class="group-actions">\n                                <label style="display:flex;align-items:center;gap:8px">\n                                    <span class="muted" style="font-size:13px">清理</span>\n                                    <span class="switch">\n                                        <input type="checkbox" data-group-id="${id}" ${checked} onchange="onToggleGroup(this)"/>\n                                        <span class="slider"></span>\n                                    </span>\n                                </label>\n                                <button class="btn" onclick="onScanGroup('${id}')">扫描</button>\n                            </div>\n                        </div>`;
-                        }).join('');
-                        document.getElementById('groups').innerHTML = rows;
+                    const r = await fetchJson('/groups', { method: 'GET' });
+                    if (!r.ok) { el.innerText = '获取失败: HTTP ' + r.status; return }
+                    const j = await r.json(); if (!j || j.code !== 0) { el.innerText = '获取失败'; return }
+                    renderGroups(j.data || []);
+                } catch (e) { el.innerText = '请求错误: ' + e.message }
+            }
+
+            function renderGroups(list) {
+                const container = document.getElementById('groups');
+                const q = (document.getElementById('q').value || '').trim().toLowerCase();
+                const filter = document.getElementById('filter').value;
+                const rows = list.filter(g => {
+                    if (q) { const t = (g.group_name || '') + '' + g.group_id; if (!t.toLowerCase().includes(q)) return false }
+                    // 仅支持 'all' 过滤，白名单开关在后端配置中管理（如有）
+                    return true
+                }).map(g => {
+                    const id = String(g.group_id);
+                    return `<div class="group" data-id="${esc(id)}"><div style="min-width:0">
+            <div style="font-weight:600">${esc(g.group_name || id)} <span class="small" style="color:#444">(${esc(id)})</span></div>
+                        <div class="meta">成员: ${g.member_count || 0} · 角色: ${esc(g.role || '')} · 可踢: ${g.canKick ? '是' : '否'}</div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+                            <div style="display:flex;gap:6px"><button onclick="openGroupModal('${esc(id)}')">设置</button></div>
+                        </div></div>`
+                }).join('');
+                container.innerHTML = rows || '<div class="small hint">无可显示群</div>';
+            }
+
+            // 打开群设置模态窗：从后端读取该群的 cron 配置并填充
+            async function openGroupModal(groupId) {
+                const modal = document.getElementById('groupModal');
+                document.getElementById('modalGroupId').innerText = groupId;
+                document.getElementById('modalTitle').innerText = '群设置 - ' + groupId;
+                // reset
+                document.getElementById('modalEnabled').checked = false;
+                document.getElementById('modalCron').value = '';
+                document.getElementById('modalInactiveDays').value = '';
+                document.getElementById('modalMessage').value = '';
+                modal.style.display = 'flex';
+                try {
+                    const r = await fetchJson('/groups/' + encodeURIComponent(groupId) + '/cron', { method: 'GET' });
+                    if (!r.ok) return;
+                    const j = await r.json();
+                    const cfg = j.data || {};
+                    document.getElementById('modalEnabled').checked = Boolean(cfg.enabled === true);
+                    document.getElementById('modalCron').value = cfg.cron || '';
+                    document.getElementById('modalInactiveDays').value = cfg.inactiveDays || '';
+                    document.getElementById('modalMessage').value = cfg.message || '';
+                } catch (e) {
+                    console.error('加载群配置失败', e);
+                }
+            }
+
+            function closeGroupModal() {
+                const modal = document.getElementById('groupModal');
+                modal.style.display = 'none';
+            }
+
+            async function saveGroupFromModal() {
+                const groupId = document.getElementById('modalGroupId').innerText;
+                const enabled = document.getElementById('modalEnabled').checked;
+                const cron = document.getElementById('modalCron').value;
+                const inactiveDays = document.getElementById('modalInactiveDays').value;
+                const message = document.getElementById('modalMessage').value;
+                if (cron && !isCronValid(cron)) { alert('cron 格式可能无效（5或6字段，不能包含 ?）'); return }
+                try {
+                    const r = await fetchJson('/groups/' + encodeURIComponent(groupId) + '/cron', { method: 'POST', body: JSON.stringify({ enabled, cron: cron || undefined, inactiveDays: inactiveDays ? Number(inactiveDays) : undefined, message: message || undefined }) });
+                    const j = await r.json();
+                    if (r.ok && j.code === 0) {
+                        alert('保存成功');
+                        closeGroupModal();
+                        fetchGroups();
                     } else {
-                        document.getElementById('groups').innerText = '获取群列表失败: ' + (json && json.message ? json.message : '未知响应');
-                    }
-                } catch (e) {
-                    document.getElementById('groups').innerText = '请求失败: ' + e.message;
-                }
-            }
-
-            window.onToggleGroup = async function (el) {
-                const groupId = el.getAttribute('data-group-id');
-                const enabled = el.checked;
-                try {
-                    const resolved = await resolveApiBase();
-                    const res = await authFetch(resolved.base + '/groups/whitelist', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ group_id: groupId, enabled })
-                    });
-                    if (!res.ok) {
-                        alert('更新失败: HTTP ' + res.status);
-                        el.checked = !enabled; // revert
-                        return;
-                    }
-                    const j = await res.json();
-                    if (j && j.code === 0) {
-                        // success
-                    } else {
-                        alert('更新失败: ' + (j && j.message));
-                        el.checked = !enabled;
-                    }
-                } catch (e) {
-                    alert('网络错误: ' + e.message);
-                    el.checked = !enabled;
-                }
-            };
-
-            window.onScanGroup = async function (groupId) {
-                const el = document.getElementById('candidates');
-                el.innerText = '扫描中...';
-                try {
-                    const resolved = await resolveApiBase();
-                    const res = await authFetch(resolved.base + `/groups/${encodeURIComponent(groupId)}/scan`, { method: 'POST' });
-                    if (!res.ok) {
-                        el.innerText = '扫描失败: HTTP ' + res.status;
-                        return;
-                    }
-                    const j = await res.json();
-                    if (!j || j.code !== 0) {
-                        el.innerText = '扫描失败: ' + (j && j.message);
-                        return;
-                    }
-                    const arr = j.data || [];
-                    if (!Array.isArray(arr) || arr.length === 0) {
-                        el.innerText = '未发现候选或该群未启用白名单/全局开关为关闭';
-                        return;
-                    }
-                    const rows = arr.map(u => `<div class="candidate-row"><strong>${escapeHtml(u.nickname || u.user_id)}</strong> <span class="muted">(${u.user_id})</span><br/><span class="muted">不活跃天数: ${u.inactive_days} · 原因: ${escapeHtml(u.reason || '')}</span></div>`).join('');
-                    el.innerHTML = rows;
-                } catch (e) {
-                    el.innerText = '扫描异常: ' + e.message;
-                }
-            };
-
-            function refresh() {
-                // 仅刷新群列表和候选显示
-                const groupsEl = document.getElementById('groups');
-                const candEl = document.getElementById('candidates');
-                if (groupsEl) groupsEl.innerText = '加载中...';
-                if (candEl) candEl.innerText = '尚未扫描';
-                fetchGroups();
-                loadCronConfig();
-            }
-
-            // 加载cron配置
-            async function loadCronConfig() {
-                try {
-                    const resolved = await resolveApiBase();
-                    const res = await authFetch(resolved.base + '/config');
-                    if (!res.ok) return;
-
-                    const json = await res.json();
-                    if (json && json.code === 0) {
-                        const config = json.data || {};
-                        document.getElementById('globalCron').value = config.globalCron || '';
-                        document.getElementById('globalInactiveDays').value = config.inactiveDays || '';
-                    }
-                } catch (e) {
-                    console.error('加载全局配置失败:', e);
-                }
-
-                // 加载群cron配置
-                loadGroupCronConfigs();
-            }
-
-            // 加载群cron配置
-            async function loadGroupCronConfigs() {
-                try {
-                    const resolved = await resolveApiBase();
-                    const groupsRes = await authFetch(resolved.base + '/groups');
-                    if (!groupsRes.ok) return;
-
-                    const groupsJson = await groupsRes.json();
-                    if (!groupsJson || groupsJson.code !== 0 || !Array.isArray(groupsJson.data)) return;
-
-                    const groupRows = await Promise.all(groupsJson.data.map(async (g) => {
-                        const groupId = String(g.group_id);
-                        let cronConfig = {};
-                        try {
-                            const cronRes = await authFetch(resolved.base + `/groups/${encodeURIComponent(groupId)}/cron`);
-                            if (cronRes.ok) {
-                                const cronJson = await cronRes.json();
-                                if (cronJson && cronJson.code === 0) {
-                                    cronConfig = cronJson.data || {};
-                                }
-                            }
-                        } catch (e) {
-                            console.error(`加载群 ${groupId} cron配置失败:`, e);
-                        }
-
-                        return `<div class="group-cron-row">
-                            <div class="group-cron-info">
-                                <span class="group-cron-title">${escapeHtml(g.group_name || groupId)}</span>
-                                <span class="muted" style="font-size:13px">ID: ${groupId}</span>
-                            </div>
-                            <div class="group-cron-form">
-                                <label style="display:flex;align-items:center;gap:4px">
-                                    <input type="checkbox" data-group-id="${groupId}" ${cronConfig.enabled ? 'checked' : ''} onchange="onToggleGroupCron(this)">
-                                    <span style="font-size:13px">启用</span>
-                                </label>
-                                <input type="text" data-group-id="${groupId}" data-field="cron" placeholder="cron表达式" value="${escapeHtml(cronConfig.cron || '')}" style="width:100px">
-                                <input type="number" min="1" data-group-id="${groupId}" data-field="inactiveDays" placeholder="不活跃天数" value="${escapeHtml(cronConfig.inactiveDays || '')}" style="width:90px">
-                                <input type="text" data-group-id="${groupId}" data-field="message" placeholder="消息内容" value="${escapeHtml(cronConfig.message || '')}" style="width:120px">
-                                <!-- 单独保存按钮已移除，使用顶部的"保存所有配置"统一保存 -->
-                            </div>
-                        </div>`;
-                    }));
-
-                    document.getElementById('group-cron-list').innerHTML = groupRows.join('');
-                } catch (e) {
-                    document.getElementById('group-cron-list').innerText = '加载群配置失败: ' + e.message;
-                }
-            }
-
-            // 保存所有配置（全局 + 各群）
-            window.saveAllConfig = async function () {
-                try {
-                    const resolved = await resolveApiBase();
-                    const globalCron = document.getElementById('globalCron').value;
-                    const globalInactiveDays = Number(document.getElementById('globalInactiveDays').value) || undefined;
-
-                    const groupRows = Array.from(document.querySelectorAll('.group-cron-row'));
-                    const groupConfigs = {};
-                    for (const row of groupRows) {
-                        const gid = row.querySelector('.group-cron-title')?.innerText || '';
-                        // ID text is like "Name (ID)"? Prefer data attribute
-                        const idMeta = row.querySelector('.muted');
-                        let groupId = '';
-                        if (idMeta) {
-                            const txt = idMeta.innerText || '';
-                            const m = txt.match(/ID:\s*(\d+)/);
-                            if (m) groupId = m[1];
-                        }
-                        if (!groupId) continue;
-
-                        const enabledEl = row.querySelector(`input[type=checkbox][data-group-id='${groupId}']`);
-                        const cronEl = row.querySelector(`input[data-group-id='${groupId}'][data-field='cron']`);
-                        const msgEl = row.querySelector(`input[data-group-id='${groupId}'][data-field='message']`);
-                        const inactiveEl = row.querySelector(`input[data-group-id='${groupId}'][data-field='inactiveDays']`);
-
-                        groupConfigs[groupId] = {
-                            enabled: enabledEl ? Boolean(enabledEl.checked) : false,
-                            cron: cronEl ? cronEl.value : undefined,
-                            message: msgEl ? msgEl.value : undefined,
-                            inactiveDays: inactiveEl && inactiveEl.value ? Number(inactiveEl.value) : undefined
-                        };
-                    }
-
-                    const body = {
-                        globalCron: globalCron,
-                        inactiveDays: globalInactiveDays,
-                        groupConfigs: groupConfigs
-                    };
-
-                    const resultEl = document.getElementById('save-result');
-                    resultEl.innerHTML = '';
-
-                    const res = await authFetch(resolved.base + '/config', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(body)
-                    });
-
-                    // 尝试解析响应体（若非 JSON 则忽略解析错误）
-                    let resJson = null;
-                    try { resJson = await res.json(); } catch (e) { /* ignore */ }
-
-                    if (res.ok) {
-                        resultEl.innerHTML = '<div style="color:var(--success-color);font-weight:600">配置已保存</div>';
-                        // reload configs to refresh UI
-                        loadCronConfig();
-                    } else {
-                        // 优先显示后端返回的 errors 字段（如果存在）
-                        if (resJson && Array.isArray(resJson.errors) && resJson.errors.length > 0) {
-                            const items = resJson.errors.map(e => `<li>${escapeHtml(String(e))}</li>`).join('');
-                            resultEl.innerHTML = `<div style="color:#e53e3e"><strong>保存失败：</strong><ul style="margin:6px 0 0 18px">${items}</ul></div>`;
-                        } else if (resJson && resJson.message) {
-                            resultEl.innerHTML = `<div style="color:#e53e3e">保存失败: ${escapeHtml(String(resJson.message))}</div>`;
-                        } else {
-                            resultEl.innerHTML = `<div style="color:#e53e3e">保存失败: HTTP ${res.status}</div>`;
-                        }
+                        alert('保存失败: ' + (j && j.message ? j.message : '未知'));
                     }
                 } catch (e) {
                     alert('网络错误: ' + e.message);
                 }
-            };
+            }
 
-            // 切换群cron启用状态
-            window.onToggleGroupCron = async function (el) {
-                const groupId = el.getAttribute('data-group-id');
-                const enabled = el.checked;
-
+            async function loadConfig() {
                 try {
-                    const resolved = await resolveApiBase();
-                    const res = await authFetch(resolved.base + `/groups/${encodeURIComponent(groupId)}/cron`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ enabled })
-                    });
+                    const r = await fetchJson('/config', { method: 'GET' });
+                    if (!r.ok) return; const j = await r.json(); const cfg = j.data || {};
+                    document.getElementById('globalCron').value = cfg.globalCron || '';
+                    document.getElementById('globalInactiveDays').value = cfg.inactiveDays || '';
+                } catch (e) { console.error(e) }
+            }
 
-                    if (!res.ok) {
-                        alert('更新失败: HTTP ' + res.status);
-                        el.checked = !enabled;
-                    }
-                } catch (e) {
-                    alert('网络错误: ' + e.message);
-                    el.checked = !enabled;
-                }
-            };
+            // 群快速编辑面板已移除；使用模态窗管理单群配置
 
-            // 保存群cron配置
-            window.saveGroupCron = async function (groupId) {
-                const row = document.querySelector(`[data-group-id="${groupId}"].group-cron-row`);
-                if (!row) return;
+            function isCronValid(s) { if (!s) return true; const parts = s.trim().split(/\s+/); return parts.length === 5 || parts.length === 6 ? !s.includes('?') : false }
 
-                const cronInput = row.querySelector(`input[data-field="cron"]`);
-                const messageInput = row.querySelector(`input[data-field="message"]`);
-
-                const config = {
-                    cron: cronInput ? cronInput.value : '',
-                    message: messageInput ? messageInput.value : ''
-                };
-
+            async function saveAll() {
+                const cron = document.getElementById('globalCron').value; const days = document.getElementById('globalInactiveDays').value;
+                if (cron && !isCronValid(cron)) { alert('全局 cron 格式可能无效'); return }
+                // 只提交全局与群配置为空时（快速路径）
+                const body = { globalCron: cron || undefined, inactiveDays: days ? Number(days) : undefined };
                 try {
-                    const resolved = await resolveApiBase();
-                    const res = await authFetch(resolved.base + `/groups/${encodeURIComponent(groupId)}/cron`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(config)
-                    });
+                    const r = await fetchJson('/config', { method: 'POST', body: JSON.stringify(body) });
+                    const j = await r.json(); if (r.ok && j.code === 0) { alert('保存成功'); loadConfig() } else { alert('保存失败') }
+                } catch (e) { alert('保存异常') }
+            }
 
-                    if (res.ok) {
-                        alert('群配置保存成功');
-                    } else {
-                        alert('保存失败: HTTP ' + res.status);
-                    }
-                } catch (e) {
-                    alert('网络错误: ' + e.message);
-                }
-            };
+            document.getElementById('refreshBtn').addEventListener('click', () => { fetchGroups(); loadConfig(); });
+            document.getElementById('saveBtn').addEventListener('click', saveAll);
+            document.getElementById('q').addEventListener('input', () => fetchGroups());
+            document.getElementById('filter').addEventListener('change', () => fetchGroups());
 
-            // 初始化
-            refresh();
-            // 可选：定期刷新群列表
-            // setInterval(fetchGroups, 60000);
-            // 暴露调试函数
-            window.__resolveApiBase = resolveApiBase;
-        })();
-    </script>
-    <script>
-        // 监听主 UI 的主题切换（data-theme / class 改变）以便在调试时看到变化。
-        // 实际颜色由 CSS 变量驱动，这里只是保证样式在变量变化时重新渲染。
-        (function () {
-            const root = document.documentElement;
-            const mo = new MutationObserver(() => {
-                // 触发 reflow（无副作用），让浏览器应用新的 CSS 变量
-                document.body.style.transform = 'translateZ(0)';
-                setTimeout(() => document.body.style.transform = '', 0);
-            });
-            mo.observe(root, { attributes: true, attributeFilter: ['data-theme', 'class'] });
-            // 清理函数（页面卸载时无需保留）
-            window.addEventListener('unload', () => mo.disconnect());
+            // expose modal handlers to global scope so inline onclick in generated HTML works
+            window.openGroupModal = openGroupModal;
+            window.closeGroupModal = closeGroupModal;
+            window.saveGroupFromModal = saveGroupFromModal;
+
+            // init
+            fetchGroups(); loadStatus(); loadConfig();
         })();
     </script>
 </body>

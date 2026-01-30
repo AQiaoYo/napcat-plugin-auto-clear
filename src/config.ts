@@ -5,12 +5,11 @@ import type { PluginConfig } from './types';
 export const DEFAULT_CONFIG: PluginConfig = {
     // 仅保留一个全局开关与按群白名单
     enabled: true,
+    // whiteList 已下线，保留空结构以向后兼容
     whitelist: {},
 
     // 新增：定时任务默认配置
     globalCron: '*/30 * * * * *', // 每30秒一次（测试用）
-    globalMessage: '定时任务测试消息',
-    globalTargetQQ: '',
     groupConfigs: {}
 };
 
@@ -36,8 +35,6 @@ export function initConfigUI(ctx: NapCatPluginContext) {
             </div>
         `),
         ctx.NapCatConfig.text('globalCron', '全局Cron表达式', DEFAULT_CONFIG.globalCron, 'cron表达式，格式：分 时 日 月 周（例如：0 8 * * * 表示每天早上8点）', true),
-        ctx.NapCatConfig.text('globalMessage', '全局消息内容', DEFAULT_CONFIG.globalMessage, '定时发送的消息内容', true),
-        ctx.NapCatConfig.text('globalTargetQQ', '全局目标QQ', DEFAULT_CONFIG.globalTargetQQ, '接收定时消息的QQ号', true),
         ctx.NapCatConfig.number('inactiveDays', '默认不活跃天数', 30, '成员多少天未发言视为不活跃（可被群单独配置覆盖）', true)
     );
 

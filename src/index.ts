@@ -6,10 +6,10 @@ import type { OB11Message } from 'napcat-types/napcat-onebot';
 import { EventType } from 'napcat-types/napcat-onebot/event/index';
 
 import { initConfigUI } from './config';
-import { loadConfig, saveConfig, getConfig, updateConfigField, setGroupWhitelist } from './core/state';
+import { loadConfig, saveConfig, getConfig, setConfig } from './core/state';
 import { handleMessage } from './handlers/message-handler';
 import { getGroupsWithPermissions } from './services/group-service';
-import { runScanForGroup, getLastScanResults, startScheduler, stopScheduler } from './services/cleanup-service';
+// scanning/cleanup service removed: no longer importing runScanForGroup/getLastScanResults/startScheduler/stopScheduler
 import { startGlobalCronJob, startGroupCronJob, stopAllCronJobs, reloadAllCronJobs, getCronJobStatus, isValidCronExpression } from './services/cron-service';
 
 // 导出框架期望的变量名，框架在加载模块时会读取此导出用于展示配置 UI
@@ -82,47 +82,9 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 更新某个群的白名单开关（body: { group_id: string, enabled: boolean }）
-            ctx.router.post('/groups/whitelist', async (req: any, res: any) => {
-                try {
-                    const body = req.body || {};
-                    const groupId = String(body.group_id || body.groupId || body.id || '');
-                    const enabled = Boolean(body.enabled === true || body.enabled === 'true');
-                    if (!groupId) return res.status(400).json({ code: -1, message: 'missing group_id' });
-                    // 持久化到配置
-                    const { setGroupWhitelist } = await import('./core/state');
-                    setGroupWhitelist(ctx, groupId, enabled);
-                    res.json({ code: 0, message: 'ok', data: { group_id: groupId, enabled } });
-                } catch (e) {
-                    ctx.logger.error('设置群白名单失败:', e);
-                    res.status(500).json({ code: -1, message: String(e) });
-                }
-            });
+            // 白名单 API 已移除（功能下线）
 
-            // 手动触发扫描（dry-run）并返回候选
-            ctx.router.post('/groups/:id/scan', async (req: any, res: any) => {
-                try {
-                    const groupId = String(req.params?.id || req.body?.group_id || req.body?.id || '');
-                    if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
-                    const result = await runScanForGroup(ctx, groupId);
-                    res.json({ code: 0, data: result });
-                } catch (e) {
-                    ctx.logger.error('手动扫描失败:', e);
-                    res.status(500).json({ code: -1, message: String(e) });
-                }
-            });
-
-            // 获取最近一次扫描结果
-            ctx.router.get('/groups/:id/candidates', async (req: any, res: any) => {
-                try {
-                    const groupId = String(req.params?.id || '');
-                    if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
-                    const r = getLastScanResults(groupId);
-                    res.json({ code: 0, data: r });
-                } catch (e) {
-                    ctx.logger.error('获取扫描结果失败:', e);
-                    res.status(500).json({ code: -1, message: String(e) });
-                }
-            });
+            // 已移除手动扫描与候选查询接口（功能已下线）
 
             ctx.router.post('/config', async (req: any, res: any) => {
                 try {
@@ -253,13 +215,6 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
         } catch (e) {
             ctx.logger.debug('⚠️ 注册 WebUI 路由失败（环境可能不支持或 ctx.router 不存在）', e);
         }
-        // 启动自动扫描调度（dry-run），每天一次；仅在支持 ctx.actions 时有意义
-        try {
-            startScheduler(ctx);
-        } catch (e) {
-            ctx.logger.error('启动自动扫描调度失败:', e);
-        }
-
         // 启动定时任务调度
         try {
             reloadAllCronJobs(ctx);
@@ -283,11 +238,7 @@ const plugin_onmessage = async (ctx: NapCatPluginContext, event: OB11Message) =>
 
 const plugin_cleanup = async (ctx: NapCatPluginContext) => {
     ctx.logger.info(`🔌 ${ctx.pluginName} 插件已卸载`);
-    try {
-        stopScheduler();
-    } catch (e) {
-        ctx.logger.debug('停止扫描调度失败', e);
-    }
+    // 已移除自动扫描调度（cleanup-service），无需停止
     try {
         stopAllCronJobs();
     } catch (e) {
@@ -314,8 +265,8 @@ export const plugin_on_config_change = async (
     const current = getConfig();
 
     try {
-        // 持久化单项变更
-        await updateConfigField(ctx, key as any, value);
+        // 持久化单项变更：使用 setConfig 合并保存
+        await setConfig(ctx, { [key]: value } as any);
     } catch (err) {
         ctx.logger.error('❌ 更新配置失败:', err);
     }
