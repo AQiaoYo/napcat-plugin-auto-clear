@@ -1,0 +1,209 @@
+// 入口：组织各个子模块并导出插件生命周期函数
+import type { PluginModule, NapCatPluginContext, PluginConfigSchema, PluginConfigUIController } from 'napcat-types/napcat-onebot/network/plugin-manger';
+import type { OB11Message } from 'napcat-types/napcat-onebot';
+import type { OB11EmitEventContent } from 'napcat-types/napcat-onebot/network';
+import { EventType } from 'napcat-types/napcat-onebot/event/index';
+
+import { initConfigUI } from './config';
+import { loadConfig, saveConfig, getConfig, updateConfigField } from './core/state';
+import { handleMessage } from './handlers/message-handler';
+import { getGroupsWithPermissions } from './services/group-service';
+import { runScanForGroup, getLastScanResults, startScheduler, stopScheduler } from './services/cleanup-service';
+
+// 导出框架期望的变量名，框架在加载模块时会读取此导出用于展示配置 UI
+export let plugin_config_ui: PluginConfigSchema = [];
+
+const plugin_init = async (ctx: NapCatPluginContext) => {
+    try {
+        // 诊断日志：打印 pluginName、router 与 configPath，帮助定位 WebUI 路由注册问题
+        ctx.logger.info(`🔎 plugin_init: name=${ctx.pluginName}, router=${Boolean(ctx.router)}, configPath=${String(ctx.configPath)}`);
+
+        loadConfig(ctx);
+        // 生成配置 schema 并导出，让 NapCat WebUI 能读取到最新 schema
+        const schema = initConfigUI(ctx);
+        plugin_config_ui = schema;
+        // 注册静态资源与扩展页面，供 NapCat WebUI 加载
+        try {
+            // 在 NapCat 中，ctx.router 提供静态与页面注册能力
+            // static('/static', 'webui') 会把插件目录下的 src/webui 作为静态目录暴露
+            ctx.router.static('/static', 'webui');
+            // 提供一个小脚本，页面可以通过相对路径加载来获得宿主注入的 pluginName（提高仪表盘识别率）
+            ctx.router.get('/static/plugin-info.js', (_req: any, res: any) => {
+                try {
+                    res.type('application/javascript');
+                    res.send(`window.__PLUGIN_NAME__ = ${JSON.stringify(ctx.pluginName)};`);
+                } catch (e) {
+                    // 忽略
+                    res.status(500).send('// failed to generate plugin-info');
+                }
+            });
+
+            // 提供一个简单的 info 接口，供探测使用
+            ctx.router.get('/info', (_req: any, res: any) => {
+                res.json({ code: 0, data: { pluginName: ctx.pluginName } });
+            });
+            ctx.router.page({
+                path: 'dashboard',
+                title: '插件仪表盘',
+                icon: '📊',
+                htmlFile: 'webui/dashboard.html',
+                description: '查看插件运行状态与当前配置'
+            });
+            // 注册简单的 API 路由，供扩展页面使用（/status, /config）
+            ctx.router.get('/status', (_req: any, res: any) => {
+                const uptime = Date.now() - (ctx.__startTime || Date.now());
+                res.json({
+                    code: 0,
+                    data: {
+                        pluginName: ctx.pluginName,
+                        uptime,
+                        uptimeFormatted: `${Math.floor(uptime / 1000)}s`,
+                        config: getConfig(),
+                        platform: process.platform,
+                        arch: process.arch
+                    }
+                });
+            });
+
+            ctx.router.get('/config', (_req: any, res: any) => {
+                res.json({ code: 0, data: getConfig() });
+            });
+
+            // 返回群列表及当前机器人在各群的权限信息
+            ctx.router.get('/groups', async (_req: any, res: any) => {
+                try {
+                    const data = await getGroupsWithPermissions(ctx);
+                    res.json({ code: 0, data });
+                } catch (e) {
+                    res.status(500).json({ code: -1, message: String(e) });
+                }
+            });
+
+            // 更新某个群的白名单开关（body: { group_id: string, enabled: boolean }）
+            ctx.router.post('/groups/whitelist', async (req: any, res: any) => {
+                try {
+                    const body = req.body || {};
+                    const groupId = String(body.group_id || body.groupId || body.id || '');
+                    const enabled = Boolean(body.enabled === true || body.enabled === 'true');
+                    if (!groupId) return res.status(400).json({ code: -1, message: 'missing group_id' });
+                    // 持久化到配置
+                    const { setGroupWhitelist } = await import('./core/state');
+                    setGroupWhitelist(ctx, groupId, enabled);
+                    res.json({ code: 0, message: 'ok', data: { group_id: groupId, enabled } });
+                } catch (e) {
+                    ctx.logger.error('设置群白名单失败:', e);
+                    res.status(500).json({ code: -1, message: String(e) });
+                }
+            });
+
+            // 手动触发扫描（dry-run）并返回候选
+            ctx.router.post('/groups/:id/scan', async (req: any, res: any) => {
+                try {
+                    const groupId = String(req.params?.id || req.body?.group_id || req.body?.id || '');
+                    if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
+                    const result = await runScanForGroup(ctx, groupId);
+                    res.json({ code: 0, data: result });
+                } catch (e) {
+                    ctx.logger.error('手动扫描失败:', e);
+                    res.status(500).json({ code: -1, message: String(e) });
+                }
+            });
+
+            // 获取最近一次扫描结果
+            ctx.router.get('/groups/:id/candidates', async (req: any, res: any) => {
+                try {
+                    const groupId = String(req.params?.id || '');
+                    if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
+                    const r = getLastScanResults(groupId);
+                    res.json({ code: 0, data: r });
+                } catch (e) {
+                    ctx.logger.error('获取扫描结果失败:', e);
+                    res.status(500).json({ code: -1, message: String(e) });
+                }
+            });
+
+            ctx.router.post('/config', async (req: any, res: any) => {
+                try {
+                    const newCfg = req.body || {};
+                    // 保存并持久化
+                    await saveConfig(ctx, { ...getConfig(), ...newCfg });
+                    res.json({ code: 0, message: 'Config saved' });
+                } catch (err) {
+                    ctx.logger.error('保存配置 via /config 失败:', err);
+                    res.status(500).json({ code: -1, message: String(err) });
+                }
+            });
+            ctx.logger.debug('🔗 WebUI 页面与静态资源已注册');
+            // 记录已注册的路由（仅用于诊断）
+            try {
+                const routes = ['static:/static', 'page:/dashboard', 'get:/status', 'get:/config', 'post:/config', 'get:/static/plugin-info.js', 'get:/info'];
+                ctx.logger.info(`🛣️ 已尝试注册路由: ${routes.join(', ')}`);
+            } catch (e) {
+                // ignore
+            }
+        } catch (e) {
+            ctx.logger.debug('⚠️ 注册 WebUI 路由失败（环境可能不支持或 ctx.router 不存在）', e);
+        }
+        // 启动自动扫描调度（dry-run），每天一次；仅在支持 ctx.actions 时有意义
+        try {
+            startScheduler(ctx);
+        } catch (e) {
+            ctx.logger.error('启动自动扫描调度失败:', e);
+        }
+        ctx.logger.info(`✅ ${ctx.pluginName} 插件初始化完成`);
+        const current = getConfig();
+    } catch (error) {
+        ctx.logger.error('❌ 插件初始化失败:', error);
+    }
+};
+
+const plugin_onmessage = async (ctx: NapCatPluginContext, event: OB11Message) => {
+    const current = getConfig();
+    if (!current.enabled) return;
+    if (event.post_type !== EventType.MESSAGE || !event.raw_message) return;
+    // 插件当前只通过 enabled 开关控制行为，如需更多调试请在代码中添加日志
+    await handleMessage(ctx, event as OB11Message);
+};
+
+const plugin_cleanup = async (ctx: NapCatPluginContext) => {
+    ctx.logger.info(`🔌 ${ctx.pluginName} 插件已卸载`);
+    try {
+        stopScheduler();
+    } catch (e) {
+        ctx.logger.debug('停止调度失败', e);
+    }
+};
+
+export const plugin_get_config = async (ctx: NapCatPluginContext) => {
+    return getConfig();
+};
+
+export const plugin_set_config = async (ctx: NapCatPluginContext, config: any) => {
+    saveConfig(ctx, config);
+    ctx.logger.info('🔧 配置已更新:', config);
+};
+
+export const plugin_on_config_change = async (
+    ctx: NapCatPluginContext,
+    ui: PluginConfigUIController,
+    key: string,
+    value: any,
+    currentConfig?: Record<string, any>
+) => {
+    const current = getConfig();
+
+    try {
+        // 持久化单项变更
+        await updateConfigField(ctx, key as any, value);
+    } catch (err) {
+        ctx.logger.error('❌ 更新配置失败:', err);
+    }
+
+    // 当前仅保留一个开关，无需动态显示/隐藏其他字段
+};
+
+export {
+    plugin_init,
+    plugin_onmessage,
+    plugin_cleanup
+};

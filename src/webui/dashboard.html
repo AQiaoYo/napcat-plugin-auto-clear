@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>NapCat 插件仪表盘</title>
+    <style>
+        :root {
+            /* Prefer the host UI theme variables (heroui); fall back to plugin defaults */
+            --bg-primary: var(--heroui-background, rgba(255, 255, 255, 0.4));
+            --bg-secondary: var(--heroui-content1, rgba(255, 255, 255, 0.6));
+            --bg-card: var(--heroui-content2, rgba(255, 255, 255, 0.5));
+            --bg-item: var(--heroui-content3, rgba(0, 0, 0, 0.03));
+            --text-primary: var(--heroui-foreground, #1a1a1a);
+            --text-secondary: var(--heroui-content2-foreground, #666);
+            --text-muted: var(--heroui-foreground-300, #999);
+            --border-color: var(--heroui-divider, rgba(0, 0, 0, 0.06));
+            --accent-color: var(--heroui-primary, #52525b);
+            --accent-light: var(--heroui-primary-100, rgba(82, 82, 91, 0.1));
+            --success-color: var(--heroui-success, #17c964);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: rgba(0, 0, 0, 0.2);
+                --bg-secondary: rgba(0, 0, 0, 0.3);
+                --bg-card: rgba(255, 255, 255, 0.05);
+                --bg-item: rgba(255, 255, 255, 0.05);
+                --text-primary: #f5f5f5;
+                --text-secondary: #a1a1a1;
+                --text-muted: #666;
+                --border-color: rgba(255, 255, 255, 0.1);
+                --accent-color: #d1d5db;
+                --accent-light: rgba(82, 82, 91, 0.25);
+            }
+        }
+
+        :root {
+            /* Prefer the host UI theme variables (heroui); fall back to plugin defaults.
+               The heroui variables in NapCat are stored as H S% L% components, so use hsl(var(--heroui-...)). */
+            --bg-primary: hsl(var(--heroui-background, 0 0% 98%));
+            --bg-secondary: hsl(var(--heroui-content1, 0 0% 96%));
+            --bg-card: hsl(var(--heroui-content2, 0 0% 100%));
+            --bg-item: hsl(var(--heroui-content3, 0 0% 96%));
+            --text-primary: hsl(var(--heroui-foreground, 210 5.56% 7.06%));
+            --text-secondary: hsl(var(--heroui-content2-foreground, 210 5.56% 40%));
+            --text-muted: hsl(var(--heroui-foreground-300, 240 5.2% 33.92%));
+            --border-color: hsl(var(--heroui-divider, 0 0% 90%));
+            --accent-color: hsl(var(--heroui-primary-500, 339 90% 60%));
+            --accent-strong: hsl(var(--heroui-primary-700, 339 90% 30%));
+            --accent-light: hsl(var(--heroui-primary-100, 340 91.84% 90.39%));
+            --success-color: hsl(var(--heroui-success-500, 146 62.45% 55.1%));
+    }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: 0 6px 18px -8px var(--accent-light);
+            padding: 18px 18px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card h3,
+        .card h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .muted {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 9px;
+            border: none;
+            background: var(--accent-color);
+            color: #fff;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 1px 6px 0 var(--accent-light);
+            transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+        }
+
+        .btn:focus {
+            outline: 2px solid rgba(99, 102, 241, 0.18);
+            outline-offset: 2px;
+        }
+
+        .btn.secondary {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            box-shadow: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 10px 0 rgba(99, 102, 241, 0.12);
+        }
+
+        .group-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .group-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-item);
+            border-radius: 10px;
+            padding: 12px 14px;
+            box-shadow: 0 1px 6px 0 var(--accent-light);
+            transition: transform 0.12s, box-shadow 0.12s;
+        }
+
+        .group-row:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.06);
+        }
+
+        .group-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .group-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .group-meta {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .group-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-item);
+            border-radius: 24px;
+            transition: .3s;
+        }
+
+        .switch input:checked+.slider {
+            background: var(--accent-color);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: .3s;
+            box-shadow: 0 1px 4px 0 var(--accent-light);
+        }
+
+        .switch input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        .candidate-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .candidate-row {
+            background: var(--bg-item);
+            border-radius: 10px;
+            padding: 10px 12px;
+            box-shadow: 0 1px 6px 0 var(--accent-light);
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .candidate-row .meta {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 16px;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                max-width: 100%;
+                padding: 0 4px;
+            }
+
+            .card {
+                padding: 16px 6px;
+            }
+
+            .group-row,
+            .candidate-row {
+                padding: 10px 6px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h3>NapCat 插件仪表盘</h3>
+            <p class="muted">安全群成员清理 · 白名单管理</p>
+            <div class="actions">
+                <button class="btn" onclick="refresh()">刷新</button>
+            </div>
+        </div>
+        <div class="card">
+            <h4>机器人所在群与权限</h4>
+            <div id="groups" class="group-list muted">加载中...</div>
+        </div>
+        <div class="card">
+            <h4>扫描候选（Dry-run）</h4>
+            <div id="candidates" class="candidate-list muted">尚未扫描</div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('webui_token') || '';
+
+            // 尝试解析和探测正确的 API base
+            async function resolveApiBase() {
+                const candidates = [];
+
+                // 优先使用宿主注入的变量
+                if (window.__PLUGIN_NAME__) candidates.push(window.__PLUGIN_NAME__);
+
+                // 父窗口上可能也注入了插件名
+                try {
+                    if (window.parent && window.parent.__PLUGIN_NAME__) candidates.push(window.parent.__PLUGIN_NAME__);
+                } catch (e) {
+                    // 访问 parent 可能被同源策略阻止，忽略
+                }
+
+                // 从 location.pathname 取可能的 segment（兼容不同嵌套路径）
+                const segs = location.pathname.split('/').filter(Boolean);
+                if (segs.length >= 1) candidates.push(segs[segs.length - 1]);
+                if (segs.length >= 2) candidates.push(segs[segs.length - 2]);
+
+                // 常见默认名作为兜底
+                candidates.push('napcat-plugin-auto-clear', 'napcat-plugin-builtin', 'Plugin');
+
+                // 去重并移除空项
+                const uniq = [...new Set(candidates)].filter(Boolean);
+
+                for (const name of uniq) {
+                    const baseTry = '/api/Plugin/ext/' + name;
+                    try {
+                        const res = await authFetch(baseTry + '/status', { method: 'GET' });
+                        if (res.ok) {
+                            // 成功找到可用路由
+                            return { base: baseTry, tried: uniq };
+                        }
+                    } catch (e) {
+                        // 忽略网络错误，继续尝试下一个
+                    }
+                }
+                // 都失败，返回第一个候选作为 base 并把尝试列表返回给前端用来显示诊断信息
+                return { base: '/api/Plugin/ext/' + (window.__PLUGIN_NAME__ || location.pathname.split('/').filter(Boolean).pop() || 'napcat-plugin-auto-clear'), tried: uniq };
+            }
+
+            async function authFetch(url, opts) {
+                const headers = (opts && opts.headers) || {};
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const res = await fetch(url, { ...opts, headers });
+                return res;
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            }
+
+            async function fetchGroups() {
+                try {
+                    const resolved = await resolveApiBase();
+                    const res = await authFetch(resolved.base + '/groups');
+                    if (!res.ok) {
+                        document.getElementById('groups').innerText = `获取群列表失败 (HTTP ${res.status}). 尝试的 candidates: ${resolved.tried.join(', ')}`;
+                        return;
+                    }
+                    const json = await res.json();
+                    if (json && json.code === 0 && Array.isArray(json.data)) {
+                        const arr = json.data;
+                        if (arr.length === 0) {
+                            document.getElementById('groups').innerText = '未加入任何群或无法获取群列表';
+                            return;
+                        }
+                        const rows = arr.map(g => {
+                            const id = String(g.group_id);
+                            const checked = g.whitelisted ? 'checked' : '';
+                            return `<div class="group-row">\n                            <div class="group-info">\n                                <span class="group-title">${escapeHtml(g.group_name || id)} <span class="muted">(${id})</span></span>\n                                <span class="group-meta">成员: ${g.member_count} · 角色: ${g.role} · 可踢人: ${g.canKick ? '是' : '否'} · 可禁言: ${g.canBan ? '是' : '否'}</span>\n                            </div>\n                            <div class="group-actions">\n                                <label style="display:flex;align-items:center;gap:8px">\n                                    <span class="muted" style="font-size:13px">清理</span>\n                                    <span class="switch">\n                                        <input type="checkbox" data-group-id="${id}" ${checked} onchange="onToggleGroup(this)"/>\n                                        <span class="slider"></span>\n                                    </span>\n                                </label>\n                                <button class="btn" onclick="onScanGroup('${id}')">扫描</button>\n                            </div>\n                        </div>`;
+                        }).join('');
+                        document.getElementById('groups').innerHTML = rows;
+                    } else {
+                        document.getElementById('groups').innerText = '获取群列表失败: ' + (json && json.message ? json.message : '未知响应');
+                    }
+                } catch (e) {
+                    document.getElementById('groups').innerText = '请求失败: ' + e.message;
+                }
+            }
+
+            window.onToggleGroup = async function (el) {
+                const groupId = el.getAttribute('data-group-id');
+                const enabled = el.checked;
+                try {
+                    const resolved = await resolveApiBase();
+                    const res = await authFetch(resolved.base + '/groups/whitelist', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ group_id: groupId, enabled })
+                    });
+                    if (!res.ok) {
+                        alert('更新失败: HTTP ' + res.status);
+                        el.checked = !enabled; // revert
+                        return;
+                    }
+                    const j = await res.json();
+                    if (j && j.code === 0) {
+                        // success
+                    } else {
+                        alert('更新失败: ' + (j && j.message));
+                        el.checked = !enabled;
+                    }
+                } catch (e) {
+                    alert('网络错误: ' + e.message);
+                    el.checked = !enabled;
+                }
+            };
+
+            window.onScanGroup = async function (groupId) {
+                const el = document.getElementById('candidates');
+                el.innerText = '扫描中...';
+                try {
+                    const resolved = await resolveApiBase();
+                    const res = await authFetch(resolved.base + `/groups/${encodeURIComponent(groupId)}/scan`, { method: 'POST' });
+                    if (!res.ok) {
+                        el.innerText = '扫描失败: HTTP ' + res.status;
+                        return;
+                    }
+                    const j = await res.json();
+                    if (!j || j.code !== 0) {
+                        el.innerText = '扫描失败: ' + (j && j.message);
+                        return;
+                    }
+                    const arr = j.data || [];
+                    if (!Array.isArray(arr) || arr.length === 0) {
+                        el.innerText = '未发现候选或该群未启用白名单/全局开关为关闭';
+                        return;
+                    }
+                    const rows = arr.map(u => `<div class="candidate-row"><strong>${escapeHtml(u.nickname || u.user_id)}</strong> <span class="muted">(${u.user_id})</span><br/><span class="muted">不活跃天数: ${u.inactive_days} · 原因: ${escapeHtml(u.reason || '')}</span></div>`).join('');
+                    el.innerHTML = rows;
+                } catch (e) {
+                    el.innerText = '扫描异常: ' + e.message;
+                }
+            };
+
+            function refresh() {
+                // 仅刷新群列表和候选显示
+                const groupsEl = document.getElementById('groups');
+                const candEl = document.getElementById('candidates');
+                if (groupsEl) groupsEl.innerText = '加载中...';
+                if (candEl) candEl.innerText = '尚未扫描';
+                fetchGroups();
+            }
+
+            // 初始化
+            refresh();
+            // 可选：定期刷新群列表
+            // setInterval(fetchGroups, 60000);
+            // 暴露调试函数
+            window.__resolveApiBase = resolveApiBase;
+        })();
+    </script>
+    <script>
+        // 监听主 UI 的主题切换（data-theme / class 改变）以便在调试时看到变化。
+        // 实际颜色由 CSS 变量驱动，这里只是保证样式在变量变化时重新渲染。
+        (function () {
+            const root = document.documentElement;
+            const mo = new MutationObserver(() => {
+                // 触发 reflow（无副作用），让浏览器应用新的 CSS 变量
+                document.body.style.transform = 'translateZ(0)';
+                setTimeout(() => document.body.style.transform = '', 0);
+            });
+            mo.observe(root, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+            // 清理函数（页面卸载时无需保留）
+            window.addEventListener('unload', () => mo.disconnect());
+        })();
+    </script>
+</body>
+
+</html>
