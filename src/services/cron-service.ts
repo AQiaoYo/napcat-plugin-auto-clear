@@ -184,13 +184,52 @@ async function executeGlobalCronTask(ctx: NapCatPluginContext) {
  */
 async function executeGroupCronTask(ctx: NapCatPluginContext, groupId: string, message: string, targetQQ: string) {
     try {
-        const globalTargetQQ = ctx.pluginManager.config.globalTargetQQ;
-        await ctx.actions.call('send_private_msg', {
-            user_id: globalTargetQQ,
-            message: `[群 ${groupId} 定时任务] ${message}`
-        }, ctx.adapterName, ctx.pluginManager.config);
+        // 优先从持久化配置读取全局目标QQ，回退到运行时插件配置
+        const cfg = getConfig();
+        const globalTargetQQ = String(cfg.globalTargetQQ || ((ctx.pluginManager as any)?.config?.globalTargetQQ) || '').trim();
 
-        ctx.logger?.info(`群 ${groupId} 定时任务执行成功，发送消息到 ${globalTargetQQ}`);
+        // 验证目标QQ（如果未配置或无效，则回退为群内通知）
+        let userIdNum = Number(globalTargetQQ);
+        const sendToPrivate = Number.isFinite(userIdNum) && userIdNum > 0;
+        if (!sendToPrivate) {
+            ctx.logger?.warn(`群 ${groupId} 未配置有效的 globalTargetQQ，将回退为群内通知`);
+        }
+
+        // 获取最新扫描结果
+        const { runScanForGroup } = await import('./cleanup-service');
+        const candidates = await runScanForGroup(ctx, groupId);
+        let msg = '';
+        if (candidates.length === 0) {
+            msg = '本群暂无长时间未发言成员。';
+        } else {
+            msg = `以下成员长时间未发言（超过阈值）：\n`;
+            candidates.slice(0, 10).forEach((u, idx) => {
+                msg += `${idx + 1}. ${u.nickname || u.user_id}（${u.user_id}） 不活跃${u.inactive_days}天\n`;
+            });
+            if (candidates.length > 10) {
+                msg += `……等${candidates.length}人`;
+            }
+        }
+        if (sendToPrivate) {
+            // 发送私聊到 globalTargetQQ
+            await ctx.actions.call('send_private_msg', {
+                user_id: userIdNum,
+                message: msg
+            }, ctx.adapterName, ctx.pluginManager.config);
+            ctx.logger?.info(`群 ${groupId} 定时任务执行成功，发送私聊到 ${globalTargetQQ}`);
+        } else {
+            // 回退为群内通知
+            const groupIdNum = Number(groupId);
+            if (!Number.isFinite(groupIdNum) || groupIdNum <= 0) {
+                ctx.logger?.error(`群 ${groupId} 定时任务失败: 无效的 groupId，且未配置有效 globalTargetQQ`);
+                return;
+            }
+            await ctx.actions.call('send_group_msg', {
+                group_id: groupIdNum,
+                message: msg
+            }, ctx.adapterName, ctx.pluginManager.config);
+            ctx.logger?.info(`群 ${groupId} 定时任务执行成功，发送群消息`);
+        }
     } catch (error) {
         ctx.logger?.error(`执行群 ${groupId} 定时任务失败:`, error);
     }

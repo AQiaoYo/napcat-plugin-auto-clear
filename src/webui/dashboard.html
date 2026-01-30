@@ -637,6 +637,7 @@
                                     <span style="font-size:13px">启用</span>
                                 </label>
                                 <input type="text" data-group-id="${groupId}" data-field="cron" placeholder="cron表达式" value="${escapeHtml(cronConfig.cron || '')}" style="width:100px">
+                                <input type="number" min="1" data-group-id="${groupId}" data-field="inactiveDays" placeholder="不活跃天数" value="${escapeHtml(cronConfig.inactiveDays || '')}" style="width:90px">
                                 <input type="text" data-group-id="${groupId}" data-field="message" placeholder="消息内容" value="${escapeHtml(cronConfig.message || '')}" style="width:120px">
                                 <button class="btn" onclick="saveGroupCron('${groupId}')" style="padding:6px 12px;font-size:13px">保存</button>
                             </div>

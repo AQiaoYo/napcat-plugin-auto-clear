@@ -26,6 +26,11 @@ export async function runScanForGroup(ctx: NapCatPluginContext, groupId: string)
             return [];
         }
 
+        // 读取群配置的inactiveDays，没有则用全局默认
+        const groupConfig = cfg.groupConfigs?.[groupId] || {};
+        const inactiveDays = groupConfig.inactiveDays || cfg.inactiveDays || 30;
+        const INACTIVITY_MS = inactiveDays * 24 * 60 * 60 * 1000;
+
         // 找到机器人自身 id 以排除
         let botId: string | undefined;
         try {
@@ -37,29 +42,28 @@ export async function runScanForGroup(ctx: NapCatPluginContext, groupId: string)
 
         const now = Date.now();
 
-        // 计算不活跃阈值（默认 30 天），未来可改为可配置
-        const INACTIVITY_MS = 30 * 24 * 60 * 60 * 1000;
-
         const candidates: Array<Record<string, any>> = [];
 
         for (const m of members || []) {
             const userId = String(m.user_id || m.userId || m.uid || '');
-            if (!userId) continue;
             if (userId === botId) continue; // 忽略机器人自身
 
             // 跳过 owner/admin
             const role = m.role || m.user_role || m.role_name || '';
             if (role === 'owner' || role === 'admin') continue;
 
+            // 若无法获得 lastActive，则使用 join_time 作为保守估计（不作为清理理由）
+            const joinTime = m.join_time ? Number(m.join_time) * 1000 : (m.join_time_ms ? Number(m.join_time_ms) : 0);
+
             // last_sent_time 字段常见于 OneBot 实现
-            const lastSent = m.last_sent_time || m.last_sent_time || m.last_sent || m.last_sent_at || 0;
+            let lastSent = m.last_sent_time || m.last_sent || m.last_sent_at || 0;
+            // 如果 last_sent_time 为 0，按 API 约定用 join_time（joinTime 已是 ms）
+            if ((!lastSent || lastSent === 0) && joinTime) lastSent = Math.floor(joinTime / 1000);
+
             let lastActive = 0;
             if (typeof lastSent === 'number' && lastSent > 0) lastActive = lastSent * 1000; // assume seconds -> ms
             // 某些实现可能直接返回 ms
             if (lastActive === 0 && typeof m.last_active === 'number') lastActive = m.last_active;
-
-            // 若无法获得 lastActive，则使用 join_time 作为保守估计（不作为清理理由）
-            const joinTime = m.join_time ? Number(m.join_time) * 1000 : (m.join_time_ms ? Number(m.join_time_ms) : 0);
 
             const inactiveMs = lastActive ? (now - lastActive) : (joinTime ? (now - joinTime) : Infinity);
 

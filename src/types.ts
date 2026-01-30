@@ -15,6 +15,8 @@ export interface PluginConfig {
     globalMessage?: string;
     // globalTargetQQ - 全局目标QQ号
     globalTargetQQ?: string;
+    // inactiveDays - 默认不活跃天数
+    inactiveDays?: number;
     // groupConfigs - 按群的单独配置
     groupConfigs?: Record<string, GroupCronConfig>;
 }
@@ -26,6 +28,8 @@ export interface GroupCronConfig {
     cron?: string;
     // message - 消息内容，为空则使用全局配置
     message?: string;
+    // inactiveDays - 判定为不活跃的天数
+    inactiveDays?: number;
 }
 
 // 导出配置 UI 容器（导出对象的属性可被各模块修改，避免对 import 绑定重新赋值）
