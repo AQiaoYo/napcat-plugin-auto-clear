@@ -1,6 +1,11 @@
+/**
+ * API 服务
+ * 封装 NapCat Actions 调用
+ */
+
 import type { NapCatPluginContext } from 'napcat-types/napcat-onebot/network/plugin-manger';
 
-// 简单的 API 封装（方便后续扩展）
+/** 调用 NapCat Action */
 export async function callAction(
     ctx: NapCatPluginContext,
     action: Parameters<NapCatPluginContext['actions']['call']>[0],

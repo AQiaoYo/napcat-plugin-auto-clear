@@ -1,7 +1,15 @@
+/**
+ * 群服务
+ * 获取群列表和机器人权限信息
+ */
+
 import type { NapCatPluginContext } from 'napcat-types/napcat-onebot/network/plugin-manger';
 import { getConfig } from '../core/state';
 
-// 返回群列表及机器人在每个群的权限信息
+/** 日志前缀 */
+const LOG_TAG = '[AutoClear]';
+
+/** 获取群列表及机器人在每个群的权限信息 */
 export async function getGroupsWithPermissions(ctx: NapCatPluginContext) {
     try {
         if (!ctx.actions) return [];
@@ -46,7 +54,7 @@ export async function getGroupsWithPermissions(ctx: NapCatPluginContext) {
 
         return out;
     } catch (error) {
-        ctx.logger?.error('getGroupsWithPermissions error:', error);
+        ctx.logger?.error(`${LOG_TAG} 获取群权限信息失败:`, error);
         return [];
     }
 }

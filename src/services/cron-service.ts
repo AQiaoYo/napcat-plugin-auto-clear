@@ -1,9 +1,18 @@
+/**
+ * 定时任务服务
+ * 负责管理 cron 定时清理任务的启动、停止和调度
+ */
+
 import * as cron from 'node-cron';
 import type { NapCatPluginContext } from 'napcat-types/napcat-onebot/network/plugin-manger';
 import { getConfig } from '../core/state';
 import type { GroupCronConfig } from '../types';
+import { runCleanupAndNotify } from './cleanup-service';
 
-// 存储活跃的cron任务
+/** 日志前缀 */
+const LOG_TAG = '[AutoClear]';
+
+/** 存储活跃的 cron 任务 */
 const activeCronJobs: Map<string, cron.ScheduledTask> = new Map();
 
 /**
@@ -44,20 +53,16 @@ export function startGlobalCronJob(ctx: NapCatPluginContext) {
     const config = getConfig();
 
     if (!config.enabled || !config.globalCron) {
-        ctx.logger?.info('全局定时任务未启用或未配置 globalCron');
+        ctx.logger?.debug(`${LOG_TAG} 全局定时任务未启用或未配置`);
         return;
     }
 
-    // 验证cron表达式
     const validCron = getValidCronExpression(config.globalCron || '');
     if (validCron !== (config.globalCron || '')) {
-        ctx.logger?.warn(`无效的cron表达式 "${config.globalCron}"，使用默认值 "${validCron}"`);
+        ctx.logger?.warn(`${LOG_TAG} 无效的 cron 表达式 "${config.globalCron}"，使用默认值 "${validCron}"`);
     }
 
-    ctx.logger?.info(`准备启动全局定时任务，cron: "${validCron}"`);
-
     try {
-        // 停止已存在的全局任务
         stopCronJob('global');
 
         const job = cron.schedule(validCron, async () => {
@@ -65,9 +70,9 @@ export function startGlobalCronJob(ctx: NapCatPluginContext) {
         });
 
         activeCronJobs.set('global', job);
-        ctx.logger?.info(`全局定时任务已启动: ${validCron}`);
+        ctx.logger?.info(`${LOG_TAG} 全局定时任务已启动 | cron=${validCron}`);
     } catch (error) {
-        ctx.logger?.error(`启动全局定时任务失败, cron: "${validCron}":`, error);
+        ctx.logger?.error(`${LOG_TAG} 启动全局定时任务失败 | cron=${validCron}`, error);
     }
 }
 
@@ -83,23 +88,19 @@ export function startGroupCronJob(ctx: NapCatPluginContext, groupId: string) {
         return;
     }
 
-    // 使用群配置或回退到全局配置
     const cronExpression = groupConfig.cron || config.globalCron || '';
-
-    // 验证cron表达式
     const validCron = getValidCronExpression(cronExpression);
 
     if (!validCron) {
-        ctx.logger?.info(`群 ${groupId} 定时任务未启用或cron表达式无效`);
+        ctx.logger?.debug(`${LOG_TAG} 群 ${groupId} 定时任务未启用或 cron 表达式无效`);
         return;
     }
 
     if (validCron !== cronExpression) {
-        ctx.logger?.warn(`群 ${groupId} 无效的cron表达式 "${cronExpression}"，使用默认值 "${validCron}"`);
+        ctx.logger?.warn(`${LOG_TAG} 群 ${groupId} 无效的 cron 表达式 "${cronExpression}"，使用默认值 "${validCron}"`);
     }
 
     try {
-        // 停止已存在的群任务
         stopCronJob(`group_${groupId}`);
 
         const job = cron.schedule(validCron, async () => {
@@ -107,9 +108,9 @@ export function startGroupCronJob(ctx: NapCatPluginContext, groupId: string) {
         });
 
         activeCronJobs.set(`group_${groupId}`, job);
-        ctx.logger?.info(`群 ${groupId} 定时任务已启动: ${validCron}`);
+        ctx.logger?.info(`${LOG_TAG} 群 ${groupId} 定时任务已启动 | cron=${validCron}`);
     } catch (error) {
-        ctx.logger?.error(`启动群 ${groupId} 定时任务失败:`, error);
+        ctx.logger?.error(`${LOG_TAG} 启动群 ${groupId} 定时任务失败:`, error);
     }
 }
 
@@ -161,9 +162,9 @@ export function reloadAllCronJobs(ctx: NapCatPluginContext) {
  */
 async function executeGlobalCronTask(ctx: NapCatPluginContext) {
     const config = getConfig();
-
-    // 全局定时任务触发时，遍历所有群配置并在各群内发送扫描结果（dry-run 风格），不再使用私聊通知
     if (!config.groupConfigs) return;
+
+    ctx.logger?.debug(`${LOG_TAG} 全局定时任务触发`);
 
     for (const groupId of Object.keys(config.groupConfigs)) {
         try {
@@ -171,43 +172,29 @@ async function executeGlobalCronTask(ctx: NapCatPluginContext) {
             if (!gc.enabled) continue;
             await executeGroupCronTask(ctx, groupId);
         } catch (e) {
-            ctx.logger?.error(`全局定时任务处理群 ${groupId} 时出错:`, e);
+            ctx.logger?.error(`${LOG_TAG} 全局定时任务处理群 ${groupId} 时出错:`, e);
         }
     }
 }
 
 /**
- * 执行群定时任务
+ * 执行群定时任务 - 清理不活跃成员
  */
 async function executeGroupCronTask(ctx: NapCatPluginContext, groupId: string) {
     try {
-        // 现在不再依赖 runScanForGroup 进行扫描；直接使用配置中的 message 字段发送通知
-        const config = getConfig();
-        const groupConfig = config.groupConfigs?.[groupId] || {} as GroupCronConfig;
-
-        let msg = '';
-        if (groupConfig.message && String(groupConfig.message).trim() !== '') {
-            msg = String(groupConfig.message);
-        } else {
-            // 如果没有任何配置消息，则记录并跳过发送，避免发送空消息
-            ctx.logger?.info(`群 ${groupId} 定时任务触发，但无配置消息，已跳过发送`);
-            return;
-        }
-
-        // 直接在群内发送通知（不进行私聊）
+        ctx.logger?.info(`${LOG_TAG} 群 ${groupId} 定时清理任务触发`);
+        
         const groupIdNum = Number(groupId);
         if (!Number.isFinite(groupIdNum) || groupIdNum <= 0) {
-            ctx.logger?.error(`群 ${groupId} 定时任务失败: 无效的 groupId`);
+            ctx.logger?.error(`${LOG_TAG} 群 ${groupId} 定时任务失败: 无效的 groupId`);
             return;
         }
 
-        await ctx.actions.call('send_group_msg', {
-            group_id: groupIdNum,
-            message: msg
-        }, ctx.adapterName, ctx.pluginManager.config);
-        ctx.logger?.info(`群 ${groupId} 定时任务执行成功，发送群消息`);
+        const result = await runCleanupAndNotify(ctx, groupId);
+        
+        ctx.logger?.info(`${LOG_TAG} 群 ${groupId} 定时清理完成 | 不活跃=${result.inactiveMembers}, ${result.dryRun ? '试运行模式' : `已清理=${result.kickedMembers}`}`);
     } catch (error) {
-        ctx.logger?.error(`执行群 ${groupId} 定时任务失败:`, error);
+        ctx.logger?.error(`${LOG_TAG} 执行群 ${groupId} 定时清理任务失败:`, error);
     }
 }
 

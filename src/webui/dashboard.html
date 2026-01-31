@@ -103,22 +103,14 @@
             background: var(--accent);
         }
 
-        /* 群列表滚动条 - 更细更柔和 */
+        /* 群列表滚动条 - 隐藏 */
         .group-list::-webkit-scrollbar {
-            width: 4px;
+            display: none;
         }
 
-        .group-list::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .group-list::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 2px;
-        }
-
-        .group-list::-webkit-scrollbar-thumb:hover {
-            background: var(--accent);
+        .group-list {
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
         }
 
         /* Sidebar 滚动条 */
@@ -356,7 +348,7 @@
         .sidebar {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 20px;
             min-height: 0;
             overflow: auto;
             padding-right: 4px;
@@ -433,8 +425,6 @@
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            padding-right: 8px;
-            margin-right: -4px;
         }
 
         .group-item {
@@ -451,8 +441,8 @@
 
         .group-item:hover {
             background: var(--bg-card-hover);
-            border-color: var(--border-light);
-            transform: translateX(4px);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent-glow);
         }
 
         .group-info {
@@ -630,6 +620,19 @@
             color: var(--text-muted);
         }
 
+        /* Hide number input spinner */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            appearance: none;
+            margin: 0;
+        }
+
+        input[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
         /* Alert Box */
         .alert {
             padding: 14px 14px;
@@ -662,13 +665,19 @@
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(4px);
+            background: rgba(131, 24, 67, 0.15);
+            backdrop-filter: blur(3px);
             z-index: 1000;
             align-items: center;
             justify-content: center;
             padding: 24px;
             animation: fadeIn 0.2s ease;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .modal-overlay {
+                background: rgba(0, 0, 0, 0.4);
+            }
         }
 
         .modal-overlay.active {
@@ -685,11 +694,13 @@
             border: 1px solid var(--border-color);
             border-radius: var(--radius-lg);
             width: 100%;
-            max-width: 500px;
+            max-width: 520px;
             max-height: calc(100vh - 48px);
             overflow: hidden;
             box-shadow: var(--shadow-lg);
             animation: slideUp 0.25s ease;
+            display: flex;
+            flex-direction: column;
         }
 
         @keyframes slideUp {
@@ -703,16 +714,42 @@
             }
         }
 
+        /* Modal exit animations */
+        .modal-overlay.closing {
+            animation: fadeOut 0.2s ease forwards;
+        }
+
+        .modal-overlay.closing .modal {
+            animation: slideDown 0.2s ease forwards;
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        @keyframes slideDown {
+            from { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+        }
+
         .modal-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 14px 20px;
+            padding: 12px 16px;
             border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
         }
 
         .modal-title {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
             margin: 0;
             line-height: 1.4;
@@ -739,34 +776,44 @@
         }
 
         .modal-body {
-            padding: 24px;
+            padding: 20px;
             overflow-y: auto;
+            flex: 1;
+            min-height: 0;
         }
 
         .modal-footer {
             display: flex;
             justify-content: flex-end;
-            gap: 12px;
-            padding: 16px 24px;
+            gap: 8px;
+            padding: 12px 20px;
             border-top: 1px solid var(--border-color);
             background: var(--bg-input);
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+
+        .modal-footer .btn {
+            padding: 8px 14px;
+            font-size: 13px;
         }
 
         /* Modal Group Info */
         .modal-group-info {
             display: flex;
             align-items: center;
-            gap: 16px;
-            padding: 16px;
+            gap: 12px;
+            padding: 12px;
             background: linear-gradient(135deg, var(--accent-glow), rgba(139, 92, 246, 0.15));
             border: 1px solid var(--accent);
             border-radius: var(--radius-md);
-            margin-bottom: 24px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
         }
 
         .modal-group-avatar {
-            width: 52px;
-            height: 52px;
+            width: 40px;
+            height: 40px;
             background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
             border-radius: var(--radius-md);
             flex-shrink: 0;
@@ -781,28 +828,28 @@
 
         .modal-group-details {
             flex: 1;
-            min-width: 0;
+            min-width: 100px;
         }
 
         .modal-group-name {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
         .modal-group-id {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--accent-hover);
             font-family: 'SF Mono', Consolas, monospace;
         }
 
         /* Form Elements */
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 14px;
         }
 
         .form-group:last-child {
@@ -814,17 +861,17 @@
             font-size: 13px;
             font-weight: 500;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .form-input {
             width: 100%;
-            padding: 12px 14px;
+            padding: 10px 12px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
             color: var(--text-primary);
-            font-size: 14px;
+            font-size: 13px;
             transition: var(--transition);
         }
 
@@ -842,6 +889,17 @@
             font-family: 'SF Mono', Consolas, monospace;
         }
 
+        /* Compact form row - two items side by side */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .form-row .form-group {
+            margin-bottom: 0;
+        }
+
         /* Toggle Switch */
         .toggle-wrapper {
             display: flex;
@@ -850,8 +908,18 @@
             padding: 12px 0;
         }
 
+        .toggle-wrapper-compact {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+        }
+
         .toggle-label {
-            font-size: 14px;
+            font-size: 13px;
             color: var(--text-secondary);
         }
 
@@ -859,6 +927,12 @@
             position: relative;
             width: 48px;
             height: 26px;
+            flex-shrink: 0;
+        }
+
+        .toggle.toggle-sm {
+            width: 40px;
+            height: 22px;
         }
 
         .toggle input {
@@ -888,6 +962,11 @@
             transition: var(--transition);
         }
 
+        .toggle.toggle-sm .toggle-slider::before {
+            width: 16px;
+            height: 16px;
+        }
+
         .toggle input:checked + .toggle-slider {
             background: var(--accent);
         }
@@ -896,36 +975,216 @@
             transform: translateX(22px);
         }
 
+        .toggle.toggle-sm input:checked + .toggle-slider::before {
+            transform: translateX(18px);
+        }
+
         .toggle input:focus + .toggle-slider {
             box-shadow: 0 0 0 3px var(--accent-glow);
         }
 
-        /* Stats */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 12px;
+        /* Modal last cleanup badge */
+        .modal-last-cleanup {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: var(--bg-card);
+            padding: 4px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
         }
 
-        .stat-card {
-            background: var(--bg-input);
+        /* Stats Bar (inline) */
+        .stats-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 16px;
-            text-align: center;
+            border-radius: var(--radius-lg);
+            padding: 12px 16px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
         }
 
         .stat-value {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
             color: var(--accent);
+            line-height: 1;
         }
 
         .stat-label {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-muted);
-            margin-top: 4px;
+        }
+
+        .stat-divider {
+            width: 1px;
+            height: 28px;
+            background: var(--border-color);
+        }
+
+        /* Collapsible Guide */
+        .guide-collapse {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+        }
+
+        .guide-collapse-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: var(--transition);
+            user-select: none;
+        }
+
+        .guide-collapse-header:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .guide-collapse-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .guide-collapse-icon {
+            font-size: 10px;
+            color: var(--text-muted);
+            transition: transform 0.2s ease;
+        }
+
+        .guide-collapse.expanded .guide-collapse-icon {
+            transform: rotate(180deg);
+        }
+
+        .guide-collapse-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .guide-collapse.expanded .guide-collapse-body {
+            max-height: 300px;
+        }
+
+        .guide-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 0 14px;
+        }
+
+        .guide-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .guide-num {
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .guide-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .guide-footer {
+            margin: 10px 14px 12px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            box-shadow: var(--shadow-lg);
+            animation: toastIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 300px;
+        }
+
+        .toast.success {
+            background: var(--success);
+            color: #fff;
+        }
+
+        .toast.error {
+            background: var(--danger);
+            color: #fff;
+        }
+
+        .toast.info {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .toast.fade-out {
+            animation: toastOut 0.3s ease forwards;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes toastOut {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(20px);
+            }
         }
 
 
@@ -986,22 +1245,87 @@
                 justify-content: flex-end;
             }
 
-            .stats-grid {
+            .stats-bar {
+                padding: 10px 12px;
+            }
+
+            .stat-value {
+                font-size: 16px;
+            }
+
+            .stat-label {
+                font-size: 10px;
+            }
+
+            .stat-divider {
+                height: 24px;
+            }
+
+            /* Modal responsive */
+            .modal-overlay {
+                padding: 12px;
+            }
+
+            .modal {
+                max-width: 100%;
+                max-height: calc(100vh - 24px);
+            }
+
+            .modal-body {
+                padding: 16px;
+            }
+
+            .modal-footer {
+                padding: 10px 16px;
+                gap: 6px;
+            }
+
+            .modal-footer .btn {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
+            .form-row {
                 grid-template-columns: 1fr;
+            }
+
+            .modal-group-info {
+                padding: 10px;
+                gap: 10px;
+            }
+
+            .modal-last-cleanup {
+                width: 100%;
+                text-align: center;
+                margin-top: 4px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .modal-footer {
+                flex-direction: column;
+            }
+
+            .modal-footer .btn {
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
 </head>
 
 <body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <div class="container">
         <!-- Header -->
         <header class="header">
             <div class="header-brand">
-                <div class="header-icon">🐱</div>
+                <div class="header-icon">🧹</div>
                 <div>
-                    <h1 class="header-title">NapCat · 自动清理</h1>
-                    <div class="header-subtitle">群成员管理 · 定时任务</div>
+                    <h1 class="header-title">NapCat · 鱼干清理器</h1>
+                    <div class="header-subtitle">自动清理不活跃群成员</div>
                 </div>
             </div>
             <div class="header-actions">
@@ -1053,23 +1377,56 @@
 
             <!-- Sidebar -->
             <div class="sidebar">
-                <!-- Stats Card -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <span class="card-title-icon">📊</span>
-                            <span>运行状态</span>
+                <!-- Collapsible Quick Guide -->
+                <div class="guide-collapse" id="guideCollapse">
+                    <div class="guide-collapse-header" onclick="toggleGuide()">
+                        <div class="guide-collapse-title">
+                            <span>📖</span>
+                            <span>快速指南</span>
+                        </div>
+                        <span class="guide-collapse-icon" id="guideIcon">▼</span>
+                    </div>
+                    <div class="guide-collapse-body" id="guideBody">
+                        <div class="guide-list">
+                            <div class="guide-item">
+                                <span class="guide-num">1</span>
+                                <span class="guide-text">在下方设置全局清理规则（Cron、不活跃天数）</span>
+                            </div>
+                            <div class="guide-item">
+                                <span class="guide-num">2</span>
+                                <span class="guide-text">点击左侧群卡片，开启该群的自动清理任务</span>
+                            </div>
+                            <div class="guide-item">
+                                <span class="guide-num">3</span>
+                                <span class="guide-text">首次使用建议开启"试运行模式"预览效果</span>
+                            </div>
+                        </div>
+                        <div class="guide-footer">
+                            <span>⚠️ 机器人需要管理员权限才能踢人</span>
                         </div>
                     </div>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-value" id="statGroups">-</div>
-                            <div class="stat-label">管理群数</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="statTasks">-</div>
-                            <div class="stat-label">定时任务</div>
-                        </div>
+                </div>
+
+                <!-- Stats Bar (inline) -->
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <span class="stat-value" id="statGroups">-</span>
+                        <span class="stat-label">群</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="statTasks">-</span>
+                        <span class="stat-label">任务</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="statCleanups">-</span>
+                        <span class="stat-label">清理</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="statKicked">-</span>
+                        <span class="stat-label">鱼干</span>
                     </div>
                 </div>
 
@@ -1078,29 +1435,35 @@
                     <div class="card-header">
                         <div class="card-title">
                             <span class="card-title-icon">⚙️</span>
-                            <span>全局配置</span>
+                            <span>清理配置</span>
                         </div>
                     </div>
 
                     <div class="config-section">
-                        
                         <div class="config-field">
-                            <label class="config-label">Cron 表达式</label>
+                            <label class="config-label">清理计划 (Cron)</label>
                             <input type="text" id="globalCron" class="config-input" placeholder="0 8 * * *" />
-                            <div class="config-hint">格式: 秒 分 时 日 月 周（支持 5-6 字段）</div>
+                            <div class="config-hint">格式: 秒 分 时 日 月 周（例如 0 8 * * * 每天8点）</div>
                         </div>
 
                         <div class="config-field">
-                            <label class="config-label">默认不活跃天数</label>
+                            <label class="config-label">不活跃天数阈值</label>
                             <input type="number" id="globalInactiveDays" class="config-input" min="1" placeholder="30" />
-                            <div class="config-hint">成员多少天未发言视为不活跃</div>
+                            <div class="config-hint">成员多少天未发言视为"鱼干"</div>
+                        </div>
+
+                        <div class="config-field">
+                            <div class="toggle-wrapper" style="padding: 0;">
+                                <span class="toggle-label">试运行模式</span>
+                                <label class="toggle">
+                                    <input type="checkbox" id="globalDryRun" />
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="config-hint">开启后只统计不实际踢人，建议先测试</div>
                         </div>
                     </div>
 
-                    <div class="alert alert-warning" style="margin-top: 16px;">
-                        <span class="alert-icon">⚠️</span>
-                        <span>Cron 不支持 ? 字符，请使用 * 代替</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -1110,7 +1473,7 @@
     <div class="modal-overlay" id="groupModal">
         <div class="modal">
             <div class="modal-header">
-                <h2 class="modal-title">群设置</h2>
+                <h2 class="modal-title">清理设置</h2>
                 <button class="modal-close" onclick="closeGroupModal()">&times;</button>
             </div>
             <div class="modal-body">
@@ -1123,38 +1486,55 @@
                         <div class="modal-group-name" id="modalGroupName">群名称</div>
                         <div class="modal-group-id" id="modalGroupId">123456789</div>
                     </div>
+                    <!-- 上次清理信息（紧凑显示） -->
+                    <div id="lastCleanupInfo" class="modal-last-cleanup" style="display: none;">
+                        <span id="lastCleanupText">上次: -</span>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <div class="toggle-wrapper">
-                        <span class="toggle-label">启用定时任务</span>
-                        <label class="toggle">
-                            <input type="checkbox" id="modalEnabled" />
-                            <span class="toggle-slider"></span>
-                        </label>
+                <!-- 开关组：启用 + 试运行 -->
+                <div class="form-row" style="margin-bottom: 14px;">
+                    <div class="form-group">
+                        <div class="toggle-wrapper-compact">
+                            <span class="toggle-label">启用自动清理</span>
+                            <label class="toggle toggle-sm">
+                                <input type="checkbox" id="modalEnabled" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="toggle-wrapper-compact">
+                            <span class="toggle-label">试运行模式</span>
+                            <label class="toggle toggle-sm">
+                                <input type="checkbox" id="modalDryRun" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 配置行：Cron + 天数 -->
+                <div class="form-row" style="margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label">清理计划 (Cron)</label>
+                        <input type="text" class="form-input form-input-mono" id="modalCron" placeholder="留空用全局" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">不活跃天数</label>
+                        <input type="number" class="form-input" id="modalInactiveDays" min="1" placeholder="留空用全局" />
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Cron 表达式</label>
-                    <input type="text" class="form-input form-input-mono" id="modalCron" placeholder="留空则使用全局配置" />
-                    <div class="config-hint">留空则使用全局配置的 Cron 表达式</div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">不活跃天数</label>
-                    <input type="number" class="form-input" id="modalInactiveDays" min="1" placeholder="留空则使用全局配置" />
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">定时消息内容</label>
-                    <input type="text" class="form-input" id="modalMessage" placeholder="定时任务触发时发送的消息" />
-                    <div class="config-hint">定时任务触发时将在群内发送此消息</div>
+                    <label class="form-label">受保护成员 (白名单)</label>
+                    <input type="text" class="form-input form-input-mono" id="modalProtectedMembers" placeholder="QQ号，用逗号分隔，这些成员不会被清理" />
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeGroupModal()">取消</button>
-                <button class="btn btn-primary" onclick="saveGroupFromModal()">保存设置</button>
+                <button class="btn btn-secondary" onclick="triggerManualCleanup(true)">🔍 预览清理</button>
+                <button class="btn btn-primary" style="background: var(--danger);" onclick="triggerManualCleanup(false)">🧹 立即清理</button>
+                <button class="btn btn-primary" onclick="saveGroupFromModal()">💾 保存设置</button>
             </div>
         </div>
     </div>
@@ -1169,6 +1549,9 @@
                 return h;
             }
 
+            // 路由前缀（与后端保持一致）
+            const ROUTE_PREFIX = '/clear';
+
             async function resolveApiBase() {
                 const tries = [];
                 if (window.__PLUGIN_NAME__) tries.push(window.__PLUGIN_NAME__);
@@ -1181,7 +1564,7 @@
                 for (const name of [...new Set(tries)]) {
                     const base = '/api/Plugin/ext/' + name;
                     try {
-                        const r = await fetch(base + '/status', { headers: authHeaders() });
+                        const r = await fetch(base + ROUTE_PREFIX + '/status', { headers: authHeaders() });
                         if (r.ok) return base;
                     } catch (e) { }
                 }
@@ -1193,12 +1576,28 @@
                 return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             }
 
+            // Toast notification
+            function showToast(message, type = 'info', duration = 2500) {
+                const container = document.getElementById('toastContainer');
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+                toast.innerHTML = `<span>${icon}</span><span>${esc(message)}</span>`;
+                container.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.classList.add('fade-out');
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+            }
+
             let API_BASE_P = resolveApiBase();
             let groupsData = [];
 
             async function fetchJson(path, opts) {
                 const base = await API_BASE_P;
-                const res = await fetch(base + path, Object.assign({}, opts, {
+                const fullPath = base + ROUTE_PREFIX + path;
+                const res = await fetch(fullPath, Object.assign({}, opts, {
                     headers: Object.assign(
                         { 'Content-Type': 'application/json' },
                         opts && opts.headers ? opts.headers : {},
@@ -1296,11 +1695,27 @@
                     const res = await fetchJson('/cron/status', { method: 'GET' });
                     const j = await res.json();
                     if (j && j.code === 0) {
-                        const tasks = Object.keys(j.data || {}).length;
-                        document.getElementById('statTasks').innerText = tasks;
+                        // 只统计群任务（以 group_ 开头的），不统计全局任务
+                        const groupTasks = Object.keys(j.data || {}).filter(k => k.startsWith('group_')).length;
+                        document.getElementById('statTasks').innerText = groupTasks;
                     }
                 } catch (e) {
                     document.getElementById('statTasks').innerText = '-';
+                }
+            }
+
+            async function loadCleanupStats() {
+                try {
+                    const res = await fetchJson('/cleanup/stats', { method: 'GET' });
+                    const j = await res.json();
+                    if (j && j.code === 0) {
+                        const stats = j.data || {};
+                        document.getElementById('statCleanups').innerText = stats.totalCleanups || 0;
+                        document.getElementById('statKicked').innerText = stats.totalKicked || 0;
+                    }
+                } catch (e) {
+                    document.getElementById('statCleanups').innerText = '-';
+                    document.getElementById('statKicked').innerText = '-';
                 }
             }
 
@@ -1406,7 +1821,9 @@
                 document.getElementById('modalEnabled').checked = false;
                 document.getElementById('modalCron').value = '';
                 document.getElementById('modalInactiveDays').value = '';
-                document.getElementById('modalMessage').value = '';
+                document.getElementById('modalDryRun').checked = false;
+                document.getElementById('modalProtectedMembers').value = '';
+                document.getElementById('lastCleanupInfo').style.display = 'none';
                 
                 modal.classList.add('active');
                 
@@ -1418,14 +1835,27 @@
                     document.getElementById('modalEnabled').checked = Boolean(cfg.enabled === true);
                     document.getElementById('modalCron').value = cfg.cron || '';
                     document.getElementById('modalInactiveDays').value = cfg.inactiveDays || '';
-                    document.getElementById('modalMessage').value = cfg.message || '';
+                    document.getElementById('modalDryRun').checked = Boolean(cfg.dryRun === true);
+                    document.getElementById('modalProtectedMembers').value = (cfg.protectedMembers || []).join(', ');
+                    
+                    // 显示上次清理信息
+                    if (cfg.lastCleanup) {
+                        const lastDate = new Date(cfg.lastCleanup);
+                        const dateStr = `${String(lastDate.getMonth() + 1).padStart(2, '0')}-${String(lastDate.getDate()).padStart(2, '0')} ${String(lastDate.getHours()).padStart(2, '0')}:${String(lastDate.getMinutes()).padStart(2, '0')}`;
+                        document.getElementById('lastCleanupText').innerText = `上次: ${dateStr} 清${cfg.lastCleanupCount || 0}人`;
+                        document.getElementById('lastCleanupInfo').style.display = 'block';
+                    }
                 } catch (e) {
                     console.error('加载群配置失败', e);
                 }
             }
 
             function closeGroupModal() {
-                document.getElementById('groupModal').classList.remove('active');
+                const modal = document.getElementById('groupModal');
+                modal.classList.add('closing');
+                setTimeout(() => {
+                    modal.classList.remove('active', 'closing');
+                }, 200);
             }
 
             async function saveGroupFromModal() {
@@ -1433,10 +1863,17 @@
                 const enabled = document.getElementById('modalEnabled').checked;
                 const cron = document.getElementById('modalCron').value;
                 const inactiveDays = document.getElementById('modalInactiveDays').value;
-                const message = document.getElementById('modalMessage').value;
+                const dryRun = document.getElementById('modalDryRun').checked;
+                const protectedMembersStr = document.getElementById('modalProtectedMembers').value;
+                
+                // 解析受保护成员列表
+                const protectedMembers = protectedMembersStr
+                    .split(/[,，\s]+/)
+                    .map(s => s.trim())
+                    .filter(s => s && /^\d+$/.test(s));
 
                 if (cron && !isCronValid(cron)) {
-                    alert('Cron 格式可能无效（5或6字段，不能包含 ?）');
+                    showToast('Cron 格式无效（5或6字段，不能包含 ?）', 'error');
                     return;
                 }
 
@@ -1447,20 +1884,66 @@
                             enabled,
                             cron: cron || undefined,
                             inactiveDays: inactiveDays ? Number(inactiveDays) : undefined,
-                            message: message || undefined
+                            dryRun,
+                            protectedMembers: protectedMembers.length > 0 ? protectedMembers : undefined
                         })
                     });
                     const j = await r.json();
                     if (r.ok && j.code === 0) {
-                        alert('保存成功');
-                        closeGroupModal();
-                        fetchGroups();
+                        showToast('保存成功', 'success');
+                        // 不关闭模态窗口，只刷新后台数据
                         loadCronStatus();
+                        loadCleanupStats();
                     } else {
-                        alert('保存失败: ' + (j && j.message ? j.message : '未知错误'));
+                        showToast('保存失败: ' + (j && j.message ? j.message : '未知错误'), 'error');
                     }
                 } catch (e) {
-                    alert('网络错误: ' + e.message);
+                    showToast('网络错误: ' + e.message, 'error');
+                }
+            }
+
+            async function triggerManualCleanup(dryRun) {
+                const groupId = currentGroupId;
+                if (!groupId) {
+                    showToast('请先选择一个群', 'error');
+                    return;
+                }
+
+                const group = groupsData.find(g => String(g.group_id) === groupId);
+                const groupName = group?.group_name || groupId;
+
+                if (!dryRun) {
+                    const confirmed = confirm(`确定要对"${groupName}"执行清理吗？\n\n这将踢出所有不活跃的成员！`);
+                    if (!confirmed) return;
+                }
+
+                showToast(dryRun ? '正在预览...' : '正在清理...', 'info', 1500);
+
+                try {
+                    const r = await fetchJson('/groups/' + encodeURIComponent(groupId) + '/cleanup', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            dryRun: dryRun,
+                            notify: true
+                        })
+                    });
+                    const j = await r.json();
+                    if (r.ok && j.code === 0) {
+                        const result = j.data || {};
+                        if (dryRun) {
+                            showToast(`预览完成: 发现 ${result.inactiveMembers} 条鱼干`, 'success', 3000);
+                        } else {
+                            showToast(`清理完成: 已清理 ${result.kickedMembers} 条鱼干`, 'success', 3000);
+                        }
+                        loadCleanupStats();
+                        
+                        // 重新加载群配置以更新上次清理时间
+                        openGroupModal(groupId);
+                    } else {
+                        showToast('操作失败: ' + (j && j.message ? j.message : '未知错误'), 'error');
+                    }
+                } catch (e) {
+                    showToast('网络错误: ' + e.message, 'error');
                 }
             }
 
@@ -1472,6 +1955,7 @@
                     const cfg = j.data || {};
                     document.getElementById('globalCron').value = cfg.globalCron || '';
                     document.getElementById('globalInactiveDays').value = cfg.inactiveDays || '';
+                    document.getElementById('globalDryRun').checked = Boolean(cfg.dryRun);
                 } catch (e) {
                     console.error(e);
                 }
@@ -1486,29 +1970,31 @@
             async function saveAll() {
                 const cron = document.getElementById('globalCron').value;
                 const days = document.getElementById('globalInactiveDays').value;
+                const dryRun = document.getElementById('globalDryRun').checked;
 
                 if (cron && !isCronValid(cron)) {
-                    alert('全局 Cron 格式可能无效');
+                    showToast('全局 Cron 格式无效', 'error');
                     return;
                 }
 
                 const body = {
                     globalCron: cron || undefined,
-                    inactiveDays: days ? Number(days) : undefined
+                    inactiveDays: days ? Number(days) : undefined,
+                    dryRun: dryRun
                 };
 
                 try {
                     const r = await fetchJson('/config', { method: 'POST', body: JSON.stringify(body) });
                     const j = await r.json();
                     if (r.ok && j.code === 0) {
-                        alert('保存成功');
-                        loadConfig();
+                        showToast('全局配置已保存', 'success');
                         loadCronStatus();
+                        loadCleanupStats();
                     } else {
-                        alert('保存失败');
+                        showToast('保存失败', 'error');
                     }
                 } catch (e) {
-                    alert('保存异常');
+                    showToast('保存异常', 'error');
                 }
             }
 
@@ -1518,6 +2004,7 @@
                 loadConfig();
                 loadStatus();
                 loadCronStatus();
+                loadCleanupStats();
             });
             document.getElementById('saveBtn').addEventListener('click', saveAll);
             document.getElementById('q').addEventListener('input', renderGroups);
@@ -1533,16 +2020,38 @@
                 if (e.key === 'Escape') closeGroupModal();
             });
 
+            // Toggle guide collapse
+            function toggleGuide() {
+                const guide = document.getElementById('guideCollapse');
+                guide.classList.toggle('expanded');
+                // 保存状态到 localStorage
+                localStorage.setItem('guideExpanded', guide.classList.contains('expanded') ? '1' : '0');
+            }
+
+            // 初始化时检查 localStorage 中的状态
+            function initGuideState() {
+                const expanded = localStorage.getItem('guideExpanded');
+                const guide = document.getElementById('guideCollapse');
+                // 默认展开，除非用户之前收起过
+                if (expanded !== '0') {
+                    guide.classList.add('expanded');
+                }
+            }
+
             // Expose to global
             window.openGroupModal = openGroupModal;
             window.closeGroupModal = closeGroupModal;
             window.saveGroupFromModal = saveGroupFromModal;
+            window.triggerManualCleanup = triggerManualCleanup;
+            window.toggleGuide = toggleGuide;
 
             // Init
+            initGuideState();
             fetchGroups();
             loadStatus();
             loadConfig();
             loadCronStatus();
+            loadCleanupStats();
         })();
     </script>
 </body>

@@ -1,61 +1,87 @@
-// @ts-ignore
+/**
+ * NapCat 自动清理不活跃群成员插件
+ * 
+ * 功能：
+ * - 定时扫描群成员活跃度
+ * - 自动清理长期不活跃的"鱼干"成员
+ * - 提供 WebUI 仪表盘查看状态和配置
+ * 
+ * @author AQiaoYo
+ * @license MIT
+ */
+
+// @ts-ignore - NapCat 类型定义
 import type { PluginModule, NapCatPluginContext, PluginConfigSchema, PluginConfigUIController } from 'napcat-types/napcat-onebot/network/plugin-manger';
-// @ts-ignore
+// @ts-ignore - NapCat 消息类型
 import type { OB11Message } from 'napcat-types/napcat-onebot';
-// @ts-ignore
+// @ts-ignore - NapCat 事件类型
 import { EventType } from 'napcat-types/napcat-onebot/event/index';
 
 import { initConfigUI } from './config';
 import { loadConfig, saveConfig, getConfig, setConfig } from './core/state';
 import { handleMessage } from './handlers/message-handler';
 import { getGroupsWithPermissions } from './services/group-service';
-// scanning/cleanup service removed: no longer importing runScanForGroup/getLastScanResults/startScheduler/stopScheduler
+import { runCleanupAndNotify, runCleanupForGroup, getLastCleanupResult, getCleanupStats } from './services/cleanup-service';
 import { startGlobalCronJob, startGroupCronJob, stopAllCronJobs, stopCronJob, reloadAllCronJobs, getCronJobStatus, isValidCronExpression } from './services/cron-service';
 
-// 导出框架期望的变量名，框架在加载模块时会读取此导出用于展示配置 UI
+/** 框架配置 UI Schema，NapCat WebUI 会读取此导出来展示配置面板 */
 export let plugin_config_ui: PluginConfigSchema = [];
 
+/** 路由前缀，防止与其他插件冲突 */
+const ROUTE_PREFIX = '/clear';
+
+/** 日志前缀 */
+const LOG_TAG = '[AutoClear]';
+
+/**
+ * 插件初始化函数
+ * 负责加载配置、注册 WebUI 路由、启动定时任务
+ */
 const plugin_init = async (ctx: NapCatPluginContext) => {
-    // 记录启动时间，用于计算 uptime
+    // 记录启动时间，用于计算运行时长
     (ctx as any).__startTime = Date.now();
     
     try {
-        // 诊断日志：打印 pluginName、router 与 configPath，帮助定位 WebUI 路由注册问题
-        ctx.logger.info(`🔎 plugin_init: name=${ctx.pluginName}, router=${Boolean(ctx.router)}, configPath=${String(ctx.configPath)}`);
+        ctx.logger.info(`${LOG_TAG} 初始化开始 | name=${ctx.pluginName}, router=${Boolean(ctx.router)}`);
 
         loadConfig(ctx);
-        // 生成配置 schema 并导出，让 NapCat WebUI 能读取到最新 schema
+        ctx.logger.debug(`${LOG_TAG} 配置加载完成`);
+
+        // 生成配置 schema 并导出
         const schema = initConfigUI(ctx);
         plugin_config_ui = schema;
-        // 注册静态资源与扩展页面，供 NapCat WebUI 加载
+
+        // 注册 WebUI 路由
         try {
-            // 在 NapCat 中，ctx.router 提供静态与页面注册能力
-            // static('/static', 'webui') 会把插件目录下的 src/webui 作为静态目录暴露
-            ctx.router.static('/static', 'webui');
-            // 提供一个小脚本，页面可以通过相对路径加载来获得宿主注入的 pluginName（提高仪表盘识别率）
-            ctx.router.get('/static/plugin-info.js', (_req: any, res: any) => {
+            // 静态资源目录
+            ctx.router.static(`${ROUTE_PREFIX}/static`, 'webui');
+
+            // 插件信息脚本
+            ctx.router.get(`${ROUTE_PREFIX}/static/plugin-info.js`, (_req: any, res: any) => {
                 try {
                     res.type('application/javascript');
                     res.send(`window.__PLUGIN_NAME__ = ${JSON.stringify(ctx.pluginName)};`);
                 } catch (e) {
-                    // 忽略
                     res.status(500).send('// failed to generate plugin-info');
                 }
             });
 
-            // 提供一个简单的 info 接口，供探测使用
-            ctx.router.get('/info', (_req: any, res: any) => {
+            // 基础信息接口
+            ctx.router.get(`${ROUTE_PREFIX}/info`, (_req: any, res: any) => {
                 res.json({ code: 0, data: { pluginName: ctx.pluginName } });
             });
+
+            // 仪表盘页面
             ctx.router.page({
-                path: 'dashboard',
-                title: '插件仪表盘',
-                icon: '📊',
+                path: 'clear-dashboard',
+                title: '清理插件仪表盘',
+                icon: '🧹',
                 htmlFile: 'webui/dashboard.html',
                 description: '查看插件运行状态与当前配置'
             });
-            // 注册简单的 API 路由，供扩展页面使用（/status, /config）
-            ctx.router.get('/status', (_req: any, res: any) => {
+
+            // 状态接口
+            ctx.router.get(`${ROUTE_PREFIX}/status`, (_req: any, res: any) => {
                 const uptime = Date.now() - (ctx.__startTime || Date.now());
                 res.json({
                     code: 0,
@@ -70,41 +96,36 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                 });
             });
 
-            ctx.router.get('/config', (_req: any, res: any) => {
+            // 配置读取接口
+            ctx.router.get(`${ROUTE_PREFIX}/config`, (_req: any, res: any) => {
                 res.json({ code: 0, data: getConfig() });
             });
 
-            // 返回群列表及当前机器人在各群的权限信息
-            ctx.router.get('/groups', async (_req: any, res: any) => {
+            // 群列表接口
+            ctx.router.get(`${ROUTE_PREFIX}/groups`, async (_req: any, res: any) => {
                 try {
                     const data = await getGroupsWithPermissions(ctx);
                     res.json({ code: 0, data });
                 } catch (e) {
+                    ctx.logger.error(`${LOG_TAG} 获取群列表失败:`, e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
 
-            // 更新某个群的白名单开关（body: { group_id: string, enabled: boolean }）
-            // 白名单 API 已移除（功能下线）
-
-            // 已移除手动扫描与候选查询接口（功能已下线）
-
-            ctx.router.post('/config', async (req: any, res: any) => {
+            // 配置保存接口
+            ctx.router.post(`${ROUTE_PREFIX}/config`, async (req: any, res: any) => {
                 try {
                     const newCfg = req.body || {};
-                    // 输入校验
                     const errors: string[] = [];
 
-                    // 全局cron校验
+                    // 全局 cron 校验
                     if (newCfg.globalCron !== undefined && newCfg.globalCron !== null && String(newCfg.globalCron).trim() !== '') {
                         if (!isValidCronExpression(String(newCfg.globalCron))) {
                             errors.push('globalCron: 无效的 cron 表达式（仅支持 node-cron，5 或 6 字段，不能包含 ?）');
                         }
                     }
 
-                    // 已移除 globalTargetQQ: 通知将直接发送到群内
-
-                    // 全局 inactiveDays 校验（可选，若提供须为 >=1 的整数）
+                    // 全局 inactiveDays 校验
                     if (newCfg.inactiveDays !== undefined && newCfg.inactiveDays !== null && newCfg.inactiveDays !== '') {
                         const v = Number(newCfg.inactiveDays);
                         if (!Number.isInteger(v) || v < 1) errors.push('inactiveDays: 必须为大于等于 1 的整数');
@@ -135,33 +156,33 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     }
 
                     if (errors.length > 0) {
+                        ctx.logger.warn(`${LOG_TAG} 配置校验失败: ${errors.join(', ')}`);
                         return res.status(400).json({ code: -1, message: '配置校验失败', errors });
                     }
 
-                    // 保存并持久化
                     await saveConfig(ctx, { ...getConfig(), ...newCfg });
-                    // 重新加载定时任务
                     reloadAllCronJobs(ctx);
+                    ctx.logger.info(`${LOG_TAG} 配置已保存`);
                     res.json({ code: 0, message: 'Config saved' });
                 } catch (err) {
-                    ctx.logger.error('保存配置 via /config 失败:', err);
+                    ctx.logger.error(`${LOG_TAG} 保存配置失败:`, err);
                     res.status(500).json({ code: -1, message: String(err) });
                 }
             });
 
-            // 获取定时任务状态
-            ctx.router.get('/cron/status', (_req: any, res: any) => {
+            // 定时任务状态接口
+            ctx.router.get(`${ROUTE_PREFIX}/cron/status`, (_req: any, res: any) => {
                 try {
                     const status = getCronJobStatus();
                     res.json({ code: 0, data: status });
                 } catch (e) {
-                    ctx.logger.error('获取定时任务状态失败:', e);
+                    ctx.logger.error(`${LOG_TAG} 获取定时任务状态失败:`, e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
 
-            // 更新群的定时任务配置
-            ctx.router.post('/groups/:id/cron', async (req: any, res: any) => {
+            // 更新群定时任务配置
+            ctx.router.post(`${ROUTE_PREFIX}/groups/:id/cron`, async (req: any, res: any) => {
                 try {
                     const groupId = String(req.params?.id || '');
                     if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
@@ -169,99 +190,170 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     const cronConfig = req.body || {};
                     const currentConfig = getConfig();
 
-                    // 更新群配置
                     const groupConfigs = { ...(currentConfig.groupConfigs || {}) };
                     groupConfigs[groupId] = {
                         ...groupConfigs[groupId],
                         ...cronConfig
                     };
 
-                    // 保存配置
-                    await saveConfig(ctx, {
-                        ...currentConfig,
-                        groupConfigs
-                    });
+                    await saveConfig(ctx, { ...currentConfig, groupConfigs });
 
-                    // 重新启动或停止该群的定时任务（取决于 enabled）
                     if (groupConfigs[groupId]?.enabled) {
                         startGroupCronJob(ctx, groupId);
                     } else {
                         stopCronJob(`group_${groupId}`);
                     }
 
+                    ctx.logger.info(`${LOG_TAG} 群 ${groupId} 定时任务配置已更新`);
                     res.json({ code: 0, message: 'Group cron config updated', data: { group_id: groupId, config: groupConfigs[groupId] } });
                 } catch (e) {
-                    ctx.logger.error('更新群定时任务配置失败:', e);
+                    ctx.logger.error(`${LOG_TAG} 更新群定时任务配置失败:`, e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
 
-            // 获取群的定时任务配置
-            ctx.router.get('/groups/:id/cron', (req: any, res: any) => {
+            // 获取群定时任务配置
+            ctx.router.get(`${ROUTE_PREFIX}/groups/:id/cron`, (req: any, res: any) => {
                 try {
                     const groupId = String(req.params?.id || '');
                     if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
 
                     const currentConfig = getConfig();
                     const groupConfig = currentConfig.groupConfigs?.[groupId] || {};
-
                     res.json({ code: 0, data: groupConfig });
                 } catch (e) {
-                    ctx.logger.error('获取群定时任务配置失败:', e);
+                    ctx.logger.error(`${LOG_TAG} 获取群定时任务配置失败:`, e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
-            ctx.logger.debug('🔗 WebUI 页面与静态资源已注册');
-            // 记录已注册的路由（仅用于诊断）
-            try {
-                const routes = ['static:/static', 'page:/dashboard', 'get:/status', 'get:/config', 'post:/config', 'get:/static/plugin-info.js', 'get:/info'];
-                ctx.logger.info(`🛣️ 已尝试注册路由: ${routes.join(', ')}`);
-            } catch (e) {
-                // ignore
-            }
+
+            // 手动触发群清理
+            ctx.router.post(`${ROUTE_PREFIX}/groups/:id/cleanup`, async (req: any, res: any) => {
+                try {
+                    const groupId = String(req.params?.id || '');
+                    if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
+
+                    const body = req.body || {};
+                    const dryRun = body.dryRun !== undefined ? Boolean(body.dryRun) : undefined;
+                    const notify = body.notify !== false;
+
+                    ctx.logger.info(`${LOG_TAG} 手动触发群 ${groupId} 清理 | dryRun=${dryRun}, notify=${notify}`);
+
+                    let result;
+                    if (notify) {
+                        result = await runCleanupAndNotify(ctx, groupId, dryRun);
+                    } else {
+                        result = await runCleanupForGroup(ctx, groupId, dryRun);
+                    }
+
+                    res.json({ code: 0, data: result });
+                } catch (e) {
+                    ctx.logger.error(`${LOG_TAG} 手动清理群失败:`, e);
+                    res.status(500).json({ code: -1, message: String(e) });
+                }
+            });
+
+            // 获取群清理结果
+            ctx.router.get(`${ROUTE_PREFIX}/groups/:id/cleanup/result`, (req: any, res: any) => {
+                try {
+                    const groupId = String(req.params?.id || '');
+                    if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
+
+                    const result = getLastCleanupResult(groupId);
+                    res.json({ code: 0, data: result || null });
+                } catch (e) {
+                    ctx.logger.error(`${LOG_TAG} 获取清理结果失败:`, e);
+                    res.status(500).json({ code: -1, message: String(e) });
+                }
+            });
+
+            // 清理统计接口
+            ctx.router.get(`${ROUTE_PREFIX}/cleanup/stats`, (_req: any, res: any) => {
+                try {
+                    const stats = getCleanupStats();
+                    res.json({ code: 0, data: stats });
+                } catch (e) {
+                    ctx.logger.error(`${LOG_TAG} 获取清理统计失败:`, e);
+                    res.status(500).json({ code: -1, message: String(e) });
+                }
+            });
+
+            // 记录已注册的路由
+            const routes = [
+                `static:${ROUTE_PREFIX}/static`,
+                `page:/clear-dashboard`,
+                `get:${ROUTE_PREFIX}/status`,
+                `get:${ROUTE_PREFIX}/config`,
+                `post:${ROUTE_PREFIX}/config`,
+                `get:${ROUTE_PREFIX}/static/plugin-info.js`,
+                `get:${ROUTE_PREFIX}/info`,
+                `get:${ROUTE_PREFIX}/groups`,
+                `get:${ROUTE_PREFIX}/cron/status`,
+                `post:${ROUTE_PREFIX}/groups/:id/cron`,
+                `get:${ROUTE_PREFIX}/groups/:id/cron`,
+                `post:${ROUTE_PREFIX}/groups/:id/cleanup`,
+                `get:${ROUTE_PREFIX}/groups/:id/cleanup/result`,
+                `get:${ROUTE_PREFIX}/cleanup/stats`
+            ];
+            ctx.logger.info(`${LOG_TAG} 路由注册完成 | ${routes.length} 个路由`);
+            ctx.logger.debug(`${LOG_TAG} 路由列表: ${routes.join(', ')}`);
         } catch (e) {
-            ctx.logger.debug('⚠️ 注册 WebUI 路由失败（环境可能不支持或 ctx.router 不存在）', e);
+            ctx.logger.warn(`${LOG_TAG} 注册 WebUI 路由失败（环境可能不支持）`, e);
         }
-        // 启动定时任务调度
+
+        // 启动定时任务
         try {
             reloadAllCronJobs(ctx);
+            ctx.logger.debug(`${LOG_TAG} 定时任务调度已启动`);
         } catch (e) {
-            ctx.logger.error('启动定时任务调度失败:', e);
+            ctx.logger.error(`${LOG_TAG} 启动定时任务调度失败:`, e);
         }
-        ctx.logger.info(`✅ ${ctx.pluginName} 插件初始化完成`);
-        const current = getConfig();
+
+        ctx.logger.info(`${LOG_TAG} 插件初始化完成`);
     } catch (error) {
-        ctx.logger.error('❌ 插件初始化失败:', error);
+        ctx.logger.error(`${LOG_TAG} 插件初始化失败:`, error);
     }
 };
 
+/**
+ * 消息处理函数
+ * 当收到群消息时触发，用于未来扩展（如管理员命令）
+ */
 const plugin_onmessage = async (ctx: NapCatPluginContext, event: OB11Message) => {
     const current = getConfig();
     if (!current.enabled) return;
     if (event.post_type !== EventType.MESSAGE || !event.raw_message) return;
-    // 插件当前只通过 enabled 开关控制行为，如需更多调试请在代码中添加日志
     await handleMessage(ctx, event as OB11Message);
 };
 
+/**
+ * 插件卸载函数
+ * 负责清理资源、停止定时任务
+ */
 const plugin_cleanup = async (ctx: NapCatPluginContext) => {
-    ctx.logger.info(`🔌 ${ctx.pluginName} 插件已卸载`);
-    // 已移除自动扫描调度（cleanup-service），无需停止
     try {
         stopAllCronJobs();
+        ctx.logger.info(`${LOG_TAG} 插件已卸载，定时任务已停止`);
     } catch (e) {
-        ctx.logger.debug('停止定时任务失败', e);
+        ctx.logger.warn(`${LOG_TAG} 停止定时任务时出错:`, e);
     }
 };
 
+/** 获取当前配置 */
 export const plugin_get_config = async (ctx: NapCatPluginContext) => {
     return getConfig();
 };
 
+/** 设置配置（完整替换） */
 export const plugin_set_config = async (ctx: NapCatPluginContext, config: any) => {
     saveConfig(ctx, config);
-    ctx.logger.info('🔧 配置已更新:', config);
+    ctx.logger.info(`${LOG_TAG} 配置已通过 API 更新`);
 };
 
+/**
+ * 配置变更回调
+ * 当 WebUI 中修改配置时触发，自动保存并重载定时任务
+ */
 export const plugin_on_config_change = async (
     ctx: NapCatPluginContext,
     ui: PluginConfigUIController,
@@ -269,23 +361,18 @@ export const plugin_on_config_change = async (
     value: any,
     currentConfig?: Record<string, any>
 ) => {
-    const current = getConfig();
-
     try {
-        // 持久化单项变更：使用 setConfig 合并保存
         await setConfig(ctx, { [key]: value } as any);
+        ctx.logger.debug(`${LOG_TAG} 配置项 ${key} 已更新`);
     } catch (err) {
-        ctx.logger.error('❌ 更新配置失败:', err);
+        ctx.logger.error(`${LOG_TAG} 更新配置项 ${key} 失败:`, err);
     }
 
-    // 配置变化时重新加载定时任务
     try {
         reloadAllCronJobs(ctx);
     } catch (err) {
-        ctx.logger.error('重新加载定时任务失败:', err);
+        ctx.logger.error(`${LOG_TAG} 重新加载定时任务失败:`, err);
     }
-
-    // 当前仅保留一个开关，无需动态显示/隐藏其他字段
 };
 
 export {
