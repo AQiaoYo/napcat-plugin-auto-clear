@@ -4,10 +4,7 @@
  */
 
 import type { NapCatPluginContext } from 'napcat-types/napcat-onebot/network/plugin-manger';
-import { getConfig } from '../core/state';
-
-/** 日志前缀 */
-const LOG_TAG = '[AutoClear]';
+import { pluginState } from '../core/state';
 
 /** 获取群列表及机器人在每个群的权限信息 */
 export async function getGroupsWithPermissions(ctx: NapCatPluginContext) {
@@ -37,9 +34,7 @@ export async function getGroupsWithPermissions(ctx: NapCatPluginContext) {
 
             const canKick = role === 'owner' || role === 'admin';
             const canBan = role === 'owner' || role === 'admin';
-            const cfg = getConfig();
-            const whitelist = cfg.whitelist || {};
-            const whitelisted = Boolean(whitelist[String(groupId)] === true);
+            const groupConfig = pluginState.config.groupConfigs?.[String(groupId)];
 
             out.push({
                 group_id: String(groupId),
@@ -48,13 +43,13 @@ export async function getGroupsWithPermissions(ctx: NapCatPluginContext) {
                 role,
                 canKick,
                 canBan,
-                whitelisted
+                enabled: groupConfig?.enabled ?? false
             });
         }
 
         return out;
     } catch (error) {
-        ctx.logger?.error(`${LOG_TAG} 获取群权限信息失败:`, error);
+        pluginState.log('error', '获取群权限信息失败:', error);
         return [];
     }
 }

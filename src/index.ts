@@ -18,7 +18,7 @@ import type { OB11Message } from 'napcat-types/napcat-onebot';
 import { EventType } from 'napcat-types/napcat-onebot/event/index';
 
 import { initConfigUI } from './config';
-import { loadConfig, saveConfig, getConfig, setConfig } from './core/state';
+import { pluginState } from './core/state';
 import { handleMessage } from './handlers/message-handler';
 import { getGroupsWithPermissions } from './services/group-service';
 import { runCleanupAndNotify, runCleanupForGroup, getLastCleanupResult, getCleanupStats } from './services/cleanup-service';
@@ -30,22 +30,16 @@ export let plugin_config_ui: PluginConfigSchema = [];
 /** 路由前缀，防止与其他插件冲突 */
 const ROUTE_PREFIX = '/clear';
 
-/** 日志前缀 */
-const LOG_TAG = '[AutoClear]';
-
 /**
  * 插件初始化函数
  * 负责加载配置、注册 WebUI 路由、启动定时任务
  */
 const plugin_init = async (ctx: NapCatPluginContext) => {
-    // 记录启动时间，用于计算运行时长
-    (ctx as any).__startTime = Date.now();
-
     try {
-        ctx.logger.info(`${LOG_TAG} 初始化开始 | name=${ctx.pluginName}, router=${Boolean(ctx.router)}`);
-
-        loadConfig(ctx);
-        ctx.logger.debug(`${LOG_TAG} 配置加载完成`);
+        pluginState.initFromContext(ctx);
+        pluginState.loadConfig(ctx);
+        pluginState.log('info', `初始化开始 | name=${ctx.pluginName}, router=${Boolean((ctx as any).router)}`);
+        pluginState.logDebug('配置加载完成');
 
         // 生成配置 schema 并导出
         const schema = initConfigUI(ctx);
@@ -98,14 +92,14 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
 
             // 状态接口
             prefixedRouter.get('/status', (_req: any, res: any) => {
-                const uptime = Date.now() - (((ctx as any).__startTime) || Date.now());
+                const uptime = pluginState.getUptime();
                 res.json({
                     code: 0,
                     data: {
-                        pluginName: ctx.pluginName,
+                        pluginName: pluginState.pluginName,
                         uptime,
-                        uptimeFormatted: `${Math.floor(uptime / 1000)}s`,
-                        config: getConfig(),
+                        uptimeFormatted: pluginState.getUptimeFormatted(),
+                        config: pluginState.getConfig(),
                         platform: process.platform,
                         arch: process.arch
                     }
@@ -114,7 +108,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
 
             // 配置读取接口
             prefixedRouter.get('/config', (_req: any, res: any) => {
-                res.json({ code: 0, data: getConfig() });
+                res.json({ code: 0, data: pluginState.getConfig() });
             });
 
             // 群列表接口
@@ -123,7 +117,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     const data = await getGroupsWithPermissions(ctx);
                     res.json({ code: 0, data });
                 } catch (e) {
-                    ctx.logger.error(`${LOG_TAG} 获取群列表失败:`, e);
+                    pluginState.log('error', '获取群列表失败:', e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
@@ -172,16 +166,16 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     }
 
                     if (errors.length > 0) {
-                        ctx.logger.warn(`${LOG_TAG} 配置校验失败: ${errors.join(', ')}`);
+                        pluginState.log('warn', `配置校验失败: ${errors.join(', ')}`);
                         return res.status(400).json({ code: -1, message: '配置校验失败', errors });
                     }
 
-                    await saveConfig(ctx, { ...getConfig(), ...newCfg });
+                    pluginState.setConfig(ctx, newCfg);
                     reloadAllCronJobs(ctx);
-                    ctx.logger.info(`${LOG_TAG} 配置已保存`);
+                    pluginState.log('info', '配置已保存');
                     res.json({ code: 0, message: 'Config saved' });
                 } catch (err) {
-                    ctx.logger.error(`${LOG_TAG} 保存配置失败:`, err);
+                    pluginState.log('error', '保存配置失败:', err);
                     res.status(500).json({ code: -1, message: String(err) });
                 }
             });
@@ -192,7 +186,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     const status = getCronJobStatus();
                     res.json({ code: 0, data: status });
                 } catch (e) {
-                    ctx.logger.error(`${LOG_TAG} 获取定时任务状态失败:`, e);
+                    pluginState.log('error', '获取定时任务状态失败:', e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
@@ -204,26 +198,19 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
 
                     const cronConfig = req.body || {};
-                    const currentConfig = getConfig();
+                    pluginState.updateGroupConfig(ctx, groupId, cronConfig);
 
-                    const groupConfigs = { ...(currentConfig.groupConfigs || {}) };
-                    groupConfigs[groupId] = {
-                        ...groupConfigs[groupId],
-                        ...cronConfig
-                    };
-
-                    await saveConfig(ctx, { ...currentConfig, groupConfigs });
-
-                    if (groupConfigs[groupId]?.enabled) {
+                    const groupConfig = pluginState.config.groupConfigs?.[groupId];
+                    if (groupConfig?.enabled) {
                         startGroupCronJob(ctx, groupId);
                     } else {
                         stopCronJob(`group_${groupId}`);
                     }
 
-                    ctx.logger.info(`${LOG_TAG} 群 ${groupId} 定时任务配置已更新`);
-                    res.json({ code: 0, message: 'Group cron config updated', data: { group_id: groupId, config: groupConfigs[groupId] } });
+                    pluginState.log('info', `群 ${groupId} 定时任务配置已更新`);
+                    res.json({ code: 0, message: 'Group cron config updated', data: { group_id: groupId, config: groupConfig } });
                 } catch (e) {
-                    ctx.logger.error(`${LOG_TAG} 更新群定时任务配置失败:`, e);
+                    pluginState.log('error', '更新群定时任务配置失败:', e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
@@ -234,11 +221,10 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     const groupId = String(req.params?.id || '');
                     if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
 
-                    const currentConfig = getConfig();
-                    const groupConfig = currentConfig.groupConfigs?.[groupId] || {};
+                    const groupConfig = pluginState.config.groupConfigs?.[groupId] || {};
                     res.json({ code: 0, data: groupConfig });
                 } catch (e) {
-                    ctx.logger.error(`${LOG_TAG} 获取群定时任务配置失败:`, e);
+                    pluginState.log('error', '获取群定时任务配置失败:', e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
@@ -253,7 +239,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     const dryRun = body.dryRun !== undefined ? Boolean(body.dryRun) : undefined;
                     const notify = body.notify !== false;
 
-                    ctx.logger.info(`${LOG_TAG} 手动触发群 ${groupId} 清理 | dryRun=${dryRun}, notify=${notify}`);
+                    pluginState.log('info', `手动触发群 ${groupId} 清理 | dryRun=${dryRun}, notify=${notify}`);
 
                     let result;
                     if (notify) {
@@ -264,7 +250,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
 
                     res.json({ code: 0, data: result });
                 } catch (e) {
-                    ctx.logger.error(`${LOG_TAG} 手动清理群失败:`, e);
+                    pluginState.log('error', '手动清理群失败:', e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
@@ -278,7 +264,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     const result = getLastCleanupResult(groupId);
                     res.json({ code: 0, data: result || null });
                 } catch (e) {
-                    ctx.logger.error(`${LOG_TAG} 获取清理结果失败:`, e);
+                    pluginState.log('error', '获取清理结果失败:', e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
@@ -289,7 +275,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                     const stats = getCleanupStats();
                     res.json({ code: 0, data: stats });
                 } catch (e) {
-                    ctx.logger.error(`${LOG_TAG} 获取清理统计失败:`, e);
+                    pluginState.log('error', '获取清理统计失败:', e);
                     res.status(500).json({ code: -1, message: String(e) });
                 }
             });
@@ -311,23 +297,23 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                 `get:${ROUTE_PREFIX}/groups/:id/cleanup/result`,
                 `get:${ROUTE_PREFIX}/cleanup/stats`
             ];
-            ctx.logger.info(`${LOG_TAG} 路由注册完成 | ${routes.length} 个路由`);
-            ctx.logger.debug(`${LOG_TAG} 路由列表: ${routes.join(', ')}`);
+            pluginState.log('info', `路由注册完成 | ${routes.length} 个路由`);
+            pluginState.logDebug(`路由列表: ${routes.join(', ')}`);
         } catch (e) {
-            ctx.logger.warn(`${LOG_TAG} 注册 WebUI 路由失败（环境可能不支持）`, e);
+            pluginState.log('warn', '注册 WebUI 路由失败（环境可能不支持）', e);
         }
 
         // 启动定时任务
         try {
             reloadAllCronJobs(ctx);
-            ctx.logger.debug(`${LOG_TAG} 定时任务调度已启动`);
+            pluginState.logDebug('定时任务调度已启动');
         } catch (e) {
-            ctx.logger.error(`${LOG_TAG} 启动定时任务调度失败:`, e);
+            pluginState.log('error', '启动定时任务调度失败:', e);
         }
 
-        ctx.logger.info(`${LOG_TAG} 插件初始化完成`);
+        pluginState.log('info', '插件初始化完成');
     } catch (error) {
-        ctx.logger.error(`${LOG_TAG} 插件初始化失败:`, error);
+        pluginState.log('error', '插件初始化失败:', error);
     }
 };
 
@@ -336,8 +322,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
  * 当收到群消息时触发，用于未来扩展（如管理员命令）
  */
 const plugin_onmessage = async (ctx: NapCatPluginContext, event: OB11Message) => {
-    const current = getConfig();
-    if (!current.enabled) return;
+    if (!pluginState.config.enabled) return;
     if (event.post_type !== EventType.MESSAGE || !event.raw_message) return;
     await handleMessage(ctx, event as OB11Message);
 };
@@ -349,21 +334,21 @@ const plugin_onmessage = async (ctx: NapCatPluginContext, event: OB11Message) =>
 const plugin_cleanup = async (ctx: NapCatPluginContext) => {
     try {
         stopAllCronJobs();
-        ctx.logger.info(`${LOG_TAG} 插件已卸载，定时任务已停止`);
+        pluginState.log('info', '插件已卸载，定时任务已停止');
     } catch (e) {
-        ctx.logger.warn(`${LOG_TAG} 停止定时任务时出错:`, e);
+        pluginState.log('warn', '停止定时任务时出错:', e);
     }
 };
 
 /** 获取当前配置 */
 export const plugin_get_config = async (ctx: NapCatPluginContext) => {
-    return getConfig();
+    return pluginState.getConfig();
 };
 
 /** 设置配置（完整替换） */
 export const plugin_set_config = async (ctx: NapCatPluginContext, config: any) => {
-    saveConfig(ctx, config);
-    ctx.logger.info(`${LOG_TAG} 配置已通过 API 更新`);
+    pluginState.saveConfig(ctx, config);
+    pluginState.log('info', '配置已通过 API 更新');
 };
 
 /**
@@ -378,16 +363,16 @@ export const plugin_on_config_change = async (
     currentConfig?: Record<string, any>
 ) => {
     try {
-        await setConfig(ctx, { [key]: value } as any);
-        ctx.logger.debug(`${LOG_TAG} 配置项 ${key} 已更新`);
+        pluginState.setConfig(ctx, { [key]: value } as any);
+        pluginState.logDebug(`配置项 ${key} 已更新`);
     } catch (err) {
-        ctx.logger.error(`${LOG_TAG} 更新配置项 ${key} 失败:`, err);
+        pluginState.log('error', `更新配置项 ${key} 失败:`, err);
     }
 
     try {
         reloadAllCronJobs(ctx);
     } catch (err) {
-        ctx.logger.error(`${LOG_TAG} 重新加载定时任务失败:`, err);
+        pluginState.log('error', '重新加载定时任务失败:', err);
     }
 };
 

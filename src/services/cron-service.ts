@@ -5,12 +5,9 @@
 
 import * as cron from 'node-cron';
 import type { NapCatPluginContext } from 'napcat-types/napcat-onebot/network/plugin-manger';
-import { getConfig } from '../core/state';
+import { pluginState } from '../core/state';
 import type { GroupCronConfig } from '../types';
 import { runCleanupAndNotify } from './cleanup-service';
-
-/** 日志前缀 */
-const LOG_TAG = '[AutoClear]';
 
 /** 存储活跃的 cron 任务 */
 const activeCronJobs: Map<string, cron.ScheduledTask> = new Map();
@@ -50,16 +47,16 @@ function getValidCronExpression(cronExpression: string): string {
  * 启动全局定时任务
  */
 export function startGlobalCronJob(ctx: NapCatPluginContext) {
-    const config = getConfig();
+    const config = pluginState.config;
 
     if (!config.enabled || !config.globalCron) {
-        ctx.logger?.debug(`${LOG_TAG} 全局定时任务未启用或未配置`);
+        pluginState.logDebug('全局定时任务未启用或未配置');
         return;
     }
 
     const validCron = getValidCronExpression(config.globalCron || '');
     if (validCron !== (config.globalCron || '')) {
-        ctx.logger?.warn(`${LOG_TAG} 无效的 cron 表达式 "${config.globalCron}"，使用默认值 "${validCron}"`);
+        pluginState.log('warn', `无效的 cron 表达式 "${config.globalCron}"，使用默认值 "${validCron}"`);
     }
 
     try {
@@ -70,9 +67,9 @@ export function startGlobalCronJob(ctx: NapCatPluginContext) {
         });
 
         activeCronJobs.set('global', job);
-        ctx.logger?.info(`${LOG_TAG} 全局定时任务已启动 | cron=${validCron}`);
+        pluginState.log('info', `全局定时任务已启动 | cron=${validCron}`);
     } catch (error) {
-        ctx.logger?.error(`${LOG_TAG} 启动全局定时任务失败 | cron=${validCron}`, error);
+        pluginState.log('error', `启动全局定时任务失败 | cron=${validCron}`, error);
     }
 }
 
@@ -80,7 +77,7 @@ export function startGlobalCronJob(ctx: NapCatPluginContext) {
  * 启动指定群的定时任务
  */
 export function startGroupCronJob(ctx: NapCatPluginContext, groupId: string) {
-    const config = getConfig();
+    const config = pluginState.config;
     const groupConfig = config.groupConfigs?.[groupId];
 
     if (!config.enabled || !groupConfig?.enabled) {
@@ -92,12 +89,12 @@ export function startGroupCronJob(ctx: NapCatPluginContext, groupId: string) {
     const validCron = getValidCronExpression(cronExpression);
 
     if (!validCron) {
-        ctx.logger?.debug(`${LOG_TAG} 群 ${groupId} 定时任务未启用或 cron 表达式无效`);
+        pluginState.logDebug(`群 ${groupId} 定时任务未启用或 cron 表达式无效`);
         return;
     }
 
     if (validCron !== cronExpression) {
-        ctx.logger?.warn(`${LOG_TAG} 群 ${groupId} 无效的 cron 表达式 "${cronExpression}"，使用默认值 "${validCron}"`);
+        pluginState.log('warn', `群 ${groupId} 无效的 cron 表达式 "${cronExpression}"，使用默认值 "${validCron}"`);
     }
 
     try {
@@ -108,9 +105,9 @@ export function startGroupCronJob(ctx: NapCatPluginContext, groupId: string) {
         });
 
         activeCronJobs.set(`group_${groupId}`, job);
-        ctx.logger?.info(`${LOG_TAG} 群 ${groupId} 定时任务已启动 | cron=${validCron}`);
+        pluginState.log('info', `群 ${groupId} 定时任务已启动 | cron=${validCron}`);
     } catch (error) {
-        ctx.logger?.error(`${LOG_TAG} 启动群 ${groupId} 定时任务失败:`, error);
+        pluginState.log('error', `启动群 ${groupId} 定时任务失败:`, error);
     }
 }
 
@@ -141,7 +138,7 @@ export function stopAllCronJobs() {
 export function reloadAllCronJobs(ctx: NapCatPluginContext) {
     stopAllCronJobs();
 
-    const config = getConfig();
+    const config = pluginState.config;
     if (!config.enabled) {
         return;
     }
@@ -161,10 +158,10 @@ export function reloadAllCronJobs(ctx: NapCatPluginContext) {
  * 执行全局定时任务
  */
 async function executeGlobalCronTask(ctx: NapCatPluginContext) {
-    const config = getConfig();
+    const config = pluginState.config;
     if (!config.groupConfigs) return;
 
-    ctx.logger?.debug(`${LOG_TAG} 全局定时任务触发`);
+    pluginState.logDebug('全局定时任务触发');
 
     for (const groupId of Object.keys(config.groupConfigs)) {
         try {
@@ -172,7 +169,7 @@ async function executeGlobalCronTask(ctx: NapCatPluginContext) {
             if (!gc.enabled) continue;
             await executeGroupCronTask(ctx, groupId);
         } catch (e) {
-            ctx.logger?.error(`${LOG_TAG} 全局定时任务处理群 ${groupId} 时出错:`, e);
+            pluginState.log('error', `全局定时任务处理群 ${groupId} 时出错:`, e);
         }
     }
 }
@@ -182,23 +179,21 @@ async function executeGlobalCronTask(ctx: NapCatPluginContext) {
  */
 async function executeGroupCronTask(ctx: NapCatPluginContext, groupId: string) {
     try {
-        ctx.logger?.info(`${LOG_TAG} 群 ${groupId} 定时清理任务触发`);
-        
+        pluginState.log('info', `群 ${groupId} 定时清理任务触发`);
+
         const groupIdNum = Number(groupId);
         if (!Number.isFinite(groupIdNum) || groupIdNum <= 0) {
-            ctx.logger?.error(`${LOG_TAG} 群 ${groupId} 定时任务失败: 无效的 groupId`);
+            pluginState.log('error', `群 ${groupId} 定时任务失败: 无效的 groupId`);
             return;
         }
 
         const result = await runCleanupAndNotify(ctx, groupId);
-        
-        ctx.logger?.info(`${LOG_TAG} 群 ${groupId} 定时清理完成 | 不活跃=${result.inactiveMembers}, ${result.dryRun ? '试运行模式' : `已清理=${result.kickedMembers}`}`);
-    } catch (error) {
-        ctx.logger?.error(`${LOG_TAG} 执行群 ${groupId} 定时清理任务失败:`, error);
-    }
-}
 
-/**
+        pluginState.log('info', `群 ${groupId} 定时清理完成 | 不活跃=${result.inactiveMembers}, ${result.dryRun ? '试运行模式' : `已清理=${result.kickedMembers}`}`);
+    } catch (error) {
+        pluginState.log('error', `执行群 ${groupId} 定时清理任务失败:`, error);
+    }
+}/**
  * 获取活跃的cron任务状态
  */
 export function getCronJobStatus() {
