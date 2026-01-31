@@ -10,12 +10,15 @@ import { loadConfig, saveConfig, getConfig, setConfig } from './core/state';
 import { handleMessage } from './handlers/message-handler';
 import { getGroupsWithPermissions } from './services/group-service';
 // scanning/cleanup service removed: no longer importing runScanForGroup/getLastScanResults/startScheduler/stopScheduler
-import { startGlobalCronJob, startGroupCronJob, stopAllCronJobs, reloadAllCronJobs, getCronJobStatus, isValidCronExpression } from './services/cron-service';
+import { startGlobalCronJob, startGroupCronJob, stopAllCronJobs, stopCronJob, reloadAllCronJobs, getCronJobStatus, isValidCronExpression } from './services/cron-service';
 
 // 导出框架期望的变量名，框架在加载模块时会读取此导出用于展示配置 UI
 export let plugin_config_ui: PluginConfigSchema = [];
 
 const plugin_init = async (ctx: NapCatPluginContext) => {
+    // 记录启动时间，用于计算 uptime
+    (ctx as any).__startTime = Date.now();
+    
     try {
         // 诊断日志：打印 pluginName、router 与 configPath，帮助定位 WebUI 路由注册问题
         ctx.logger.info(`🔎 plugin_init: name=${ctx.pluginName}, router=${Boolean(ctx.router)}, configPath=${String(ctx.configPath)}`);
@@ -179,8 +182,12 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                         groupConfigs
                     });
 
-                    // 重新启动该群的定时任务
-                    startGroupCronJob(ctx, groupId);
+                    // 重新启动或停止该群的定时任务（取决于 enabled）
+                    if (groupConfigs[groupId]?.enabled) {
+                        startGroupCronJob(ctx, groupId);
+                    } else {
+                        stopCronJob(`group_${groupId}`);
+                    }
 
                     res.json({ code: 0, message: 'Group cron config updated', data: { group_id: groupId, config: groupConfigs[groupId] } });
                 } catch (e) {

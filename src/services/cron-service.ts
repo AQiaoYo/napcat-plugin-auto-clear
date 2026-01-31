@@ -79,6 +79,7 @@ export function startGroupCronJob(ctx: NapCatPluginContext, groupId: string) {
     const groupConfig = config.groupConfigs?.[groupId];
 
     if (!config.enabled || !groupConfig?.enabled) {
+        stopCronJob(`group_${groupId}`);
         return;
     }
 

@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -7,230 +7,1082 @@
     <title>NapCat 插件仪表盘 · 自动清理</title>
     <style>
         :root {
-            --bg: #fff;
-            --card: #f8f9fb;
-            --muted: #6b7280;
-            --accent: #6b46c1;
-            --danger: #e11d48
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --bg-card-hover: #273548;
+            --bg-input: #0f172a;
+            --border-color: #334155;
+            --border-light: #475569;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --accent-glow: rgba(99, 102, 241, 0.25);
+            --success: #22c55e;
+            --success-bg: rgba(34, 197, 94, 0.15);
+            --warning: #f59e0b;
+            --warning-bg: rgba(245, 158, 11, 0.15);
+            --danger: #ef4444;
+            --danger-bg: rgba(239, 68, 68, 0.15);
+            --gradient-start: #6366f1;
+            --gradient-end: #8b5cf6;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+            --transition: all 0.2s ease;
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         html,
         body {
             height: 100%;
             margin: 0;
-            background: var(--bg);
-            font-family: system-ui, Segoe UI, Roboto, 'Noto Sans', Helvetica, Arial
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            overflow: hidden;
         }
 
-        .wrap {
-            max-width: 1200px;
-            margin: 14px auto;
-            padding: 12px
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
         }
 
-        .top {
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-light);
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+            height: 100%;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            border-radius: var(--radius-lg);
+            padding: 24px 32px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-lg), 0 0 40px var(--accent-glow);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px
+            flex-wrap: wrap;
+            gap: 16px;
         }
 
-        .brand {
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-icon {
+            width: 56px;
+            height: 56px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            opacity: 0.85;
+            margin-top: 4px;
+        }
+
+        .header-actions {
             display: flex;
             gap: 12px;
-            align-items: center
         }
 
-        .brand .icon {
-            font-size: 22px
-        }
-
-        .controls {
+        .header-status {
             display: flex;
-            gap: 8px
-        }
-
-        button {
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            background: #fff;
-            cursor: pointer
-        }
-
-        button.primary {
-            background: var(--accent);
-            color: #fff;
-            border-color: var(--accent)
-        }
-
-        .layout {
-            display: flex;
-            gap: 12px;
-            margin-top: 12px
-        }
-
-        .left {
-            flex: 1;
-            min-width: 0
-        }
-
-        .card {
-            background: var(--card);
-            padding: 12px;
-            border-radius: 10px;
-            border: 1px solid #e6e9ef
-        }
-
-        .card+.card {
-            margin-top: 12px
-        }
-
-        .search {
-            display: flex;
+            align-items: center;
             gap: 8px;
-            margin-bottom: 8px
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            backdrop-filter: blur(10px);
         }
 
-        input[type=text],
-        input[type=number] {
-            padding: 8px;
-            border-radius: 8px;
-            border: 1px solid #dfe4ee;
-            width: 100%
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
         }
 
-        .group {
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border-radius: var(--radius-md);
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: #fff;
+            box-shadow: var(--shadow-sm), 0 0 20px var(--accent-glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md), 0 0 30px var(--accent-glow);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-light);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 8px 12px;
+        }
+
+        .btn-ghost:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        /* Main Layout */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 360px;
+            grid-template-rows: minmax(0, 1fr);
+            gap: 24px;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        @media (max-width: 1024px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .card-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 10px;
-            border-radius: 8px;
-            background: #fff;
-            margin-bottom: 8px
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .meta {
-            color: var(--muted);
-            font-size: 13px
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        .small {
-            font-size: 13px;
-            color: var(--muted)
+        .card-title-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--accent-glow);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .card + .card {
+            margin-top: 20px;
+        }
+
+        .groups-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            height: 100%;
         }
 
         .sidebar {
-            width: 320px
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 0;
+            overflow: auto;
+            padding-right: 4px;
         }
 
-        .hint {
-            color: var(--muted);
-            font-size: 13px
+        .sidebar .card + .card {
+            margin-top: 0;
         }
 
-        .candidates {
-            margin-top: 8px
+        /* Search & Filter */
+        .search-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
         }
 
-        .candidate {
-            padding: 8px;
-            border-radius: 6px;
-            background: #fff;
-            margin-bottom: 6px
+        .search-input-wrapper {
+            flex: 1;
+            position: relative;
         }
 
-        .row {
+        .search-input-wrapper::before {
+            content: '🔍';
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            opacity: 0.6;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 14px 12px 42px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: var(--transition);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .filter-select {
+            padding: 12px 36px 12px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            transition: var(--transition);
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Group List */
+        .group-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .group-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .group-item:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-light);
+            transform: translateX(4px);
+        }
+
+        .group-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .group-avatar {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            border-radius: var(--radius-md);
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .group-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .group-details {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .group-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 6px;
+        }
+
+        .group-sub-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .group-id {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-family: 'SF Mono', Consolas, monospace;
+            background: var(--bg-card);
+            padding: 2px 8px;
+            border-radius: 4px;
+            min-width: 90px;
+        }
+
+        .group-member-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .group-actions {
             display: flex;
             gap: 8px;
-            align-items: center
+            flex-shrink: 0;
         }
 
-        @media (max-width:900px) {
-            .layout {
-                flex-direction: column
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            min-width: 56px;
+            text-align: center;
+        }
+
+        .badge-success {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .badge-warning {
+            background: var(--warning-bg);
+            color: var(--warning);
+        }
+
+        .badge-danger {
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
+
+        .badge-muted {
+            background: rgba(100, 116, 139, 0.15);
+            color: var(--text-muted);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state-text {
+            font-size: 14px;
+        }
+
+        /* Sidebar Config */
+        .config-section {
+            margin-bottom: 20px;
+        }
+
+        .config-section:last-child {
+            margin-bottom: 0;
+        }
+
+
+        .config-field {
+            margin-bottom: 16px;
+        }
+
+        .config-field:last-child {
+            margin-bottom: 0;
+        }
+
+        .config-label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .config-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .config-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: 'SF Mono', Consolas, monospace;
+            transition: var(--transition);
+        }
+
+        .config-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .config-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Alert Box */
+        .alert {
+            padding: 14px 14px;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: var(--accent-glow);
+            border: 1px solid var(--accent);
+            color: var(--accent-hover);
+        }
+
+        .alert-warning {
+            background: var(--warning-bg);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--warning);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 500px;
+            max-height: calc(100vh - 48px);
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.25s ease;
+        }
+
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 20px;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-input);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-input);
+        }
+
+        /* Modal Group Info */
+        .modal-group-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--accent-glow), rgba(139, 92, 246, 0.15));
+            border: 1px solid var(--accent);
+            border-radius: var(--radius-md);
+            margin-bottom: 24px;
+        }
+
+        .modal-group-avatar {
+            width: 52px;
+            height: 52px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            border-radius: var(--radius-md);
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .modal-group-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .modal-group-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .modal-group-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .modal-group-id {
+            font-size: 13px;
+            color: var(--accent-hover);
+            font-family: 'SF Mono', Consolas, monospace;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: var(--transition);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .form-input-mono {
+            font-family: 'SF Mono', Consolas, monospace;
+        }
+
+        /* Toggle Switch */
+        .toggle-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+        }
+
+        .toggle-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .toggle {
+            position: relative;
+            width: 48px;
+            height: 26px;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: var(--border-color);
+            border-radius: 26px;
+            transition: var(--transition);
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: var(--text-primary);
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background: var(--accent);
+        }
+
+        .toggle input:checked + .toggle-slider::before {
+            transform: translateX(22px);
+        }
+
+        .toggle input:focus + .toggle-slider {
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .stat-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 32px;
+            color: var(--text-muted);
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px;
             }
 
-            .sidebar {
-                width: 100%
+            .header {
+                padding: 20px;
+            }
+
+            .header-title {
+                font-size: 20px;
+            }
+
+            .header-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+
+            .search-bar {
+                flex-direction: column;
+            }
+
+            .group-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .group-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 
 <body>
-    <div class="wrap">
-        <div class="top">
-            <div class="brand">
-                <div class="icon">🐱</div>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-brand">
+                <div class="header-icon">🐱</div>
                 <div>
-                    <div style="font-weight:600">NapCat 插件 · 自动清理</div>
-                    <div class="small">白名单管理 · 定时扫描</div>
+                    <h1 class="header-title">NapCat · 自动清理</h1>
+                    <div class="header-subtitle">群成员管理 · 定时任务</div>
                 </div>
             </div>
-            <div class="controls">
-                <button id="refreshBtn">刷新</button>
-                <button id="saveBtn" class="primary">保存配置</button>
+            <div class="header-actions">
+                <div class="header-status">
+                    <span class="status-dot"></span>
+                    <span id="status">连接中...</span>
+                </div>
+                <button class="btn btn-secondary" id="refreshBtn">
+                    <span>🔄</span>
+                    <span>刷新</span>
+                </button>
+                <button class="btn btn-primary" id="saveBtn">
+                    <span>💾</span>
+                    <span>保存配置</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-layout">
+            <!-- Groups Panel -->
+            <div class="card groups-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-title-icon">👥</span>
+                        <span>群列表</span>
+                    </div>
+                    <span id="groupCount" class="badge badge-muted">0 个群</span>
+                </div>
+
+                <div class="search-bar">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="q" class="search-input" placeholder="搜索群名或群号..." />
+                    </div>
+                    <select id="filter" class="filter-select">
+                        <option value="all">全部群</option>
+                        <option value="admin">管理员权限</option>
+                        <option value="owner">群主权限</option>
+                    </select>
+                </div>
+
+                <div class="group-list" id="groups">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <span>加载群列表...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Stats Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span class="card-title-icon">📊</span>
+                            <span>运行状态</span>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="statGroups">-</div>
+                            <div class="stat-label">管理群数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="statTasks">-</div>
+                            <div class="stat-label">定时任务</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Global Config Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span class="card-title-icon">⚙️</span>
+                            <span>全局配置</span>
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        
+                        <div class="config-field">
+                            <label class="config-label">Cron 表达式</label>
+                            <input type="text" id="globalCron" class="config-input" placeholder="0 8 * * *" />
+                            <div class="config-hint">格式: 秒 分 时 日 月 周（支持 5-6 字段）</div>
+                        </div>
+
+                        <div class="config-field">
+                            <label class="config-label">默认不活跃天数</label>
+                            <input type="number" id="globalInactiveDays" class="config-input" min="1" placeholder="30" />
+                            <div class="config-hint">成员多少天未发言视为不活跃</div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning" style="margin-top: 16px;">
+                        <span class="alert-icon">⚠️</span>
+                        <span>Cron 不支持 ? 字符，请使用 * 代替</span>
+                    </div>
+                </div>
             </div>
         </div>
+    </div>
 
-        <div class="layout">
-            <div class="left">
-                <div class="card" id="groupsCard">
-                    <div class="row" style="justify-content:space-between;align-items:center">
-                        <strong>机器人所在群</strong>
-                        <div class="small hint" id="status">加载中…</div>
+    <!-- Group Settings Modal -->
+    <div class="modal-overlay" id="groupModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">群设置</h2>
+                <button class="modal-close" onclick="closeGroupModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- 群信息展示区 -->
+                <div class="modal-group-info">
+                    <div class="modal-group-avatar">
+                        <img id="modalGroupAvatar" src="" alt="群头像" />
                     </div>
-                    <div class="search" style="margin-top:8px">
-                        <input id="q" type="text" placeholder="按群名或群号搜索" />
-                        <select id="filter">
-                            <option value="all">全部</option>
-                        </select>
+                    <div class="modal-group-details">
+                        <div class="modal-group-name" id="modalGroupName">群名称</div>
+                        <div class="modal-group-id" id="modalGroupId">123456789</div>
                     </div>
-                    <div id="groups" style="margin-top:6px">加载中...</div>
                 </div>
 
-                <!-- group detail modal -->
-                <div id="groupModal"
-                    style="display:none;position:fixed;left:0;top:0;right:0;bottom:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);z-index:999">
-                    <div
-                        style="background:#fff;border-radius:8px;padding:16px;min-width:320px;max-width:720px;margin:16px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center">
-                            <strong id="modalTitle">群设置</strong>
-                            <button onclick="closeGroupModal()">关闭</button>
-                        </div>
-                        <div style="margin-top:10px">
-                            <div class="small">群 ID: <span id="modalGroupId" class="small"></span></div>
-                            <label class="small" style="margin-top:8px">启用（此群的定时任务）</label>
-                            <input id="modalEnabled" type="checkbox" />
-                            <label class="small" style="margin-top:8px">Cron 表达式</label>
-                            <input id="modalCron" type="text" placeholder="cron 表达式（5 或 6 字段）" />
-                            <label class="small" style="margin-top:8px">不活跃天数</label>
-                            <input id="modalInactiveDays" type="number" min="1" />
-                            <label class="small" style="margin-top:8px">消息内容</label>
-                            <input id="modalMessage" type="text" />
-                        </div>
-                        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-                            <button onclick="closeGroupModal()">取消</button>
-                            <button class="primary" onclick="saveGroupFromModal()">保存</button>
-                        </div>
+                <div class="form-group">
+                    <div class="toggle-wrapper">
+                        <span class="toggle-label">启用定时任务</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="modalEnabled" />
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Cron 表达式</label>
+                    <input type="text" class="form-input form-input-mono" id="modalCron" placeholder="留空则使用全局配置" />
+                    <div class="config-hint">留空则使用全局配置的 Cron 表达式</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">不活跃天数</label>
+                    <input type="number" class="form-input" id="modalInactiveDays" min="1" placeholder="留空则使用全局配置" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">定时消息内容</label>
+                    <input type="text" class="form-input" id="modalMessage" placeholder="定时任务触发时发送的消息" />
+                    <div class="config-hint">定时任务触发时将在群内发送此消息</div>
                 </div>
             </div>
-
-            <div class="sidebar">
-                <div class="card">
-                    <strong>定时任务 · 全局配置</strong>
-                    <div style="margin-top:8px" class="hint">node-cron（5 或 6 字段，不能包含 ?）</div>
-                    <div style="margin-top:8px">
-                        <label class="small">Cron 表达式</label>
-                        <input id="globalCron" type="text" placeholder="例如: 0 8 * * *" />
-                        <label class="small" style="margin-top:6px">默认不活跃天数</label>
-                        <input id="globalInactiveDays" type="number" min="1" placeholder="30" />
-                    </div>
-                </div>
-
-                <!-- 已将群单独配置整合至群列表的模态窗中，移除快速编辑面板 -->
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeGroupModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveGroupFromModal()">保存设置</button>
             </div>
         </div>
     </div>
@@ -240,78 +1092,252 @@
             const urlParams = new URLSearchParams(location.search);
             const token = urlParams.get('webui_token') || '';
 
-            function authHeaders(h = {}) { if (token) h['Authorization'] = 'Bearer ' + token; return h }
+            function authHeaders(h = {}) {
+                if (token) h['Authorization'] = 'Bearer ' + token;
+                return h;
+            }
 
             async function resolveApiBase() {
                 const tries = [];
                 if (window.__PLUGIN_NAME__) tries.push(window.__PLUGIN_NAME__);
-                try { if (window.parent && window.parent.__PLUGIN_NAME__) tries.push(window.parent.__PLUGIN_NAME__) } catch (e) { }
+                try {
+                    if (window.parent && window.parent.__PLUGIN_NAME__) tries.push(window.parent.__PLUGIN_NAME__);
+                } catch (e) { }
                 const segs = location.pathname.split('/').filter(Boolean);
                 if (segs.length) tries.push(segs[segs.length - 1]);
                 tries.push('napcat-plugin-auto-clear');
                 for (const name of [...new Set(tries)]) {
                     const base = '/api/Plugin/ext/' + name;
-                    try { const r = await fetch(base + '/status', { headers: authHeaders() }); if (r.ok) return base } catch (e) { }
+                    try {
+                        const r = await fetch(base + '/status', { headers: authHeaders() });
+                        if (r.ok) return base;
+                    } catch (e) { }
                 }
                 return '/api/Plugin/ext/' + (window.__PLUGIN_NAME__ || 'napcat-plugin-auto-clear');
             }
 
-            function esc(s) { if (!s && s !== 0) return ''; return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') }
+            function esc(s) {
+                if (!s && s !== 0) return '';
+                return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            }
 
             let API_BASE_P = resolveApiBase();
+            let groupsData = [];
 
-            async function fetchJson(path, opts) { const base = await API_BASE_P; const res = await fetch(base + path, Object.assign({}, opts, { headers: Object.assign({ 'Content-Type': 'application/json' }, opts && opts.headers ? opts.headers : {}, authHeaders()) })); return res }
+            async function fetchJson(path, opts) {
+                const base = await API_BASE_P;
+                const res = await fetch(base + path, Object.assign({}, opts, {
+                    headers: Object.assign(
+                        { 'Content-Type': 'application/json' },
+                        opts && opts.headers ? opts.headers : {},
+                        authHeaders()
+                    )
+                }));
+                return res;
+            }
+
+            // 格式化运行时间为友好格式
+            function formatUptime(ms) {
+                const seconds = Math.floor(ms / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const hours = Math.floor(minutes / 60);
+                const days = Math.floor(hours / 24);
+                const months = Math.floor(days / 30);
+                const years = Math.floor(days / 365);
+
+                const parts = [];
+                
+                if (years > 0) {
+                    parts.push(`${years}年`);
+                    const remainingMonths = Math.floor((days % 365) / 30);
+                    if (remainingMonths > 0) parts.push(`${remainingMonths}月`);
+                    const remainingDays = days % 30;
+                    if (remainingDays > 0) parts.push(`${remainingDays}天`);
+                } else if (months > 0) {
+                    parts.push(`${months}月`);
+                    const remainingDays = days % 30;
+                    if (remainingDays > 0) parts.push(`${remainingDays}天`);
+                    const remainingHours = hours % 24;
+                    if (remainingHours > 0) parts.push(`${remainingHours}时`);
+                } else if (days > 0) {
+                    parts.push(`${days}天`);
+                    const remainingHours = hours % 24;
+                    if (remainingHours > 0) parts.push(`${remainingHours}时`);
+                    const remainingMinutes = minutes % 60;
+                    if (remainingMinutes > 0) parts.push(`${remainingMinutes}分`);
+                } else if (hours > 0) {
+                    parts.push(`${hours}时`);
+                    const remainingMinutes = minutes % 60;
+                    if (remainingMinutes > 0) parts.push(`${remainingMinutes}分`);
+                    const remainingSeconds = seconds % 60;
+                    if (remainingSeconds > 0) parts.push(`${remainingSeconds}秒`);
+                } else if (minutes > 0) {
+                    parts.push(`${minutes}分`);
+                    const remainingSeconds = seconds % 60;
+                    if (remainingSeconds > 0) parts.push(`${remainingSeconds}秒`);
+                } else {
+                    parts.push(`${seconds}秒`);
+                }
+
+                return parts.join('');
+            }
+
+            let serverUptimeMs = 0;
+            let uptimeTimerId = null;
+            let lastFetchTime = 0;
+
+            function updateUptimeDisplay() {
+                const statusEl = document.getElementById('status');
+                if (serverUptimeMs > 0) {
+                    // 计算自上次获取以来经过的时间
+                    const elapsed = Date.now() - lastFetchTime;
+                    const currentUptime = serverUptimeMs + elapsed;
+                    statusEl.innerText = `运行 ${formatUptime(currentUptime)}`;
+                }
+            }
+
+            function startUptimeTimer() {
+                if (uptimeTimerId) clearInterval(uptimeTimerId);
+                uptimeTimerId = setInterval(updateUptimeDisplay, 1000);
+            }
 
             async function loadStatus() {
                 try {
                     const res = await fetchJson('/status', { method: 'GET' });
                     const j = await res.json();
-                    document.getElementById('status').innerText = j && j.code === 0 ? ('uptime: ' + (j.data?.uptimeFormatted || '')) : '已连接';
-                } catch (e) { document.getElementById('status').innerText = '无法连接'; }
+                    const statusEl = document.getElementById('status');
+                    if (j && j.code === 0 && j.data?.uptime !== undefined) {
+                        serverUptimeMs = j.data.uptime;
+                        lastFetchTime = Date.now();
+                        updateUptimeDisplay();
+                        startUptimeTimer();
+                    } else {
+                        statusEl.innerText = '已连接';
+                    }
+                } catch (e) {
+                    document.getElementById('status').innerText = '连接失败';
+                }
+            }
+
+            async function loadCronStatus() {
+                try {
+                    const res = await fetchJson('/cron/status', { method: 'GET' });
+                    const j = await res.json();
+                    if (j && j.code === 0) {
+                        const tasks = Object.keys(j.data || {}).length;
+                        document.getElementById('statTasks').innerText = tasks;
+                    }
+                } catch (e) {
+                    document.getElementById('statTasks').innerText = '-';
+                }
             }
 
             async function fetchGroups() {
-                const el = document.getElementById('groups'); el.innerHTML = '加载中...';
+                const el = document.getElementById('groups');
+                el.innerHTML = '<div class="loading"><div class="loading-spinner"></div><span>加载群列表...</span></div>';
                 try {
                     const r = await fetchJson('/groups', { method: 'GET' });
-                    if (!r.ok) { el.innerText = '获取失败: HTTP ' + r.status; return }
-                    const j = await r.json(); if (!j || j.code !== 0) { el.innerText = '获取失败'; return }
-                    renderGroups(j.data || []);
-                } catch (e) { el.innerText = '请求错误: ' + e.message }
+                    if (!r.ok) {
+                        el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">❌</div><div class="empty-state-text">获取失败: HTTP ${r.status}</div></div>`;
+                        return;
+                    }
+                    const j = await r.json();
+                    if (!j || j.code !== 0) {
+                        el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❌</div><div class="empty-state-text">获取失败</div></div>';
+                        return;
+                    }
+                    groupsData = j.data || [];
+                    document.getElementById('statGroups').innerText = groupsData.length;
+                    renderGroups();
+                } catch (e) {
+                    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">❌</div><div class="empty-state-text">请求错误: ${esc(e.message)}</div></div>`;
+                }
             }
 
-            function renderGroups(list) {
+            function renderGroups() {
                 const container = document.getElementById('groups');
                 const q = (document.getElementById('q').value || '').trim().toLowerCase();
                 const filter = document.getElementById('filter').value;
-                const rows = list.filter(g => {
-                    if (q) { const t = (g.group_name || '') + '' + g.group_id; if (!t.toLowerCase().includes(q)) return false }
-                    // 仅支持 'all' 过滤，白名单开关在后端配置中管理（如有）
-                    return true
-                }).map(g => {
+
+                const filtered = groupsData.filter(g => {
+                    if (q) {
+                        const t = (g.group_name || '') + '' + g.group_id;
+                        if (!t.toLowerCase().includes(q)) return false;
+                    }
+                    if (filter === 'admin' && g.role !== 'admin' && g.role !== 'owner') return false;
+                    if (filter === 'owner' && g.role !== 'owner') return false;
+                    return true;
+                });
+
+                document.getElementById('groupCount').innerText = `${filtered.length} 个群`;
+
+                if (filtered.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">没有找到匹配的群</div></div>';
+                    return;
+                }
+
+                const rows = filtered.map(g => {
                     const id = String(g.group_id);
-                    return `<div class="group" data-id="${esc(id)}"><div style="min-width:0">
-            <div style="font-weight:600">${esc(g.group_name || id)} <span class="small" style="color:#444">(${esc(id)})</span></div>
-                        <div class="meta">成员: ${g.member_count || 0} · 角色: ${esc(g.role || '')} · 可踢: ${g.canKick ? '是' : '否'}</div>
+                    const roleMap = { 'owner': '群主', 'admin': '管理员', 'member': '成员' };
+                    const roleText = roleMap[g.role] || '成员';
+                    const roleBadge = g.role === 'owner' 
+                        ? '<span class="badge badge-success">群主</span>' 
+                        : g.role === 'admin' 
+                            ? '<span class="badge badge-warning">管理员</span>' 
+                            : '<span class="badge badge-muted">' + esc(roleText) + '</span>';
+                    
+                    const kickBadge = g.canKick 
+                        ? '<span class="badge badge-success">可踢人</span>' 
+                        : '<span class="badge badge-danger">无权限</span>';
+
+                    const avatarUrl = `http://p.qlogo.cn/gh/${id}/${id}/100/`;
+                    return `
+                        <div class="group-item" onclick="openGroupModal('${esc(id)}')">
+                            <div class="group-info">
+                                <div class="group-avatar">
+                                    <img src="${esc(avatarUrl)}" alt="群头像" onerror="this.style.display='none'" />
+                                </div>
+                                <div class="group-details">
+                                    <div class="group-name">${esc(g.group_name || id)}</div>
+                                    <div class="group-sub-info">
+                                        <span class="group-id">#${esc(id)}</span>
+                                        <span class="group-member-count">👤 ${g.member_count || 0} 成员</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="group-actions">
+                                ${roleBadge}
+                                ${kickBadge}
+                                <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); openGroupModal('${esc(id)}')">
+                                    ⚙️ 设置
+                                </button>
+                            </div>
                         </div>
-                        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-                            <div style="display:flex;gap:6px"><button onclick="openGroupModal('${esc(id)}')">设置</button></div>
-                        </div></div>`
+                    `;
                 }).join('');
-                container.innerHTML = rows || '<div class="small hint">无可显示群</div>';
+
+                container.innerHTML = rows;
             }
 
-            // 打开群设置模态窗：从后端读取该群的 cron 配置并填充
+            let currentGroupId = '';
+            
             async function openGroupModal(groupId) {
                 const modal = document.getElementById('groupModal');
-                document.getElementById('modalGroupId').innerText = groupId;
-                document.getElementById('modalTitle').innerText = '群设置 - ' + groupId;
-                // reset
+                currentGroupId = groupId;
+                
+                const group = groupsData.find(g => String(g.group_id) === groupId);
+                document.getElementById('modalGroupName').innerText = group?.group_name || '未知群';
+                document.getElementById('modalGroupId').innerText = `#${groupId}`;
+                document.getElementById('modalGroupAvatar').src = `http://p.qlogo.cn/gh/${groupId}/${groupId}/100/`;
+                
+                // Reset form
                 document.getElementById('modalEnabled').checked = false;
                 document.getElementById('modalCron').value = '';
                 document.getElementById('modalInactiveDays').value = '';
                 document.getElementById('modalMessage').value = '';
-                modal.style.display = 'flex';
+                
+                modal.classList.add('active');
+                
                 try {
                     const r = await fetchJson('/groups/' + encodeURIComponent(groupId) + '/cron', { method: 'GET' });
                     if (!r.ok) return;
@@ -327,26 +1353,39 @@
             }
 
             function closeGroupModal() {
-                const modal = document.getElementById('groupModal');
-                modal.style.display = 'none';
+                document.getElementById('groupModal').classList.remove('active');
             }
 
             async function saveGroupFromModal() {
-                const groupId = document.getElementById('modalGroupId').innerText;
+                const groupId = currentGroupId;
                 const enabled = document.getElementById('modalEnabled').checked;
                 const cron = document.getElementById('modalCron').value;
                 const inactiveDays = document.getElementById('modalInactiveDays').value;
                 const message = document.getElementById('modalMessage').value;
-                if (cron && !isCronValid(cron)) { alert('cron 格式可能无效（5或6字段，不能包含 ?）'); return }
+
+                if (cron && !isCronValid(cron)) {
+                    alert('Cron 格式可能无效（5或6字段，不能包含 ?）');
+                    return;
+                }
+
                 try {
-                    const r = await fetchJson('/groups/' + encodeURIComponent(groupId) + '/cron', { method: 'POST', body: JSON.stringify({ enabled, cron: cron || undefined, inactiveDays: inactiveDays ? Number(inactiveDays) : undefined, message: message || undefined }) });
+                    const r = await fetchJson('/groups/' + encodeURIComponent(groupId) + '/cron', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            enabled,
+                            cron: cron || undefined,
+                            inactiveDays: inactiveDays ? Number(inactiveDays) : undefined,
+                            message: message || undefined
+                        })
+                    });
                     const j = await r.json();
                     if (r.ok && j.code === 0) {
                         alert('保存成功');
                         closeGroupModal();
                         fetchGroups();
+                        loadCronStatus();
                     } else {
-                        alert('保存失败: ' + (j && j.message ? j.message : '未知'));
+                        alert('保存失败: ' + (j && j.message ? j.message : '未知错误'));
                     }
                 } catch (e) {
                     alert('网络错误: ' + e.message);
@@ -356,39 +1395,82 @@
             async function loadConfig() {
                 try {
                     const r = await fetchJson('/config', { method: 'GET' });
-                    if (!r.ok) return; const j = await r.json(); const cfg = j.data || {};
+                    if (!r.ok) return;
+                    const j = await r.json();
+                    const cfg = j.data || {};
                     document.getElementById('globalCron').value = cfg.globalCron || '';
                     document.getElementById('globalInactiveDays').value = cfg.inactiveDays || '';
-                } catch (e) { console.error(e) }
+                } catch (e) {
+                    console.error(e);
+                }
             }
 
-            // 群快速编辑面板已移除；使用模态窗管理单群配置
-
-            function isCronValid(s) { if (!s) return true; const parts = s.trim().split(/\s+/); return parts.length === 5 || parts.length === 6 ? !s.includes('?') : false }
+            function isCronValid(s) {
+                if (!s) return true;
+                const parts = s.trim().split(/\s+/);
+                return (parts.length === 5 || parts.length === 6) && !s.includes('?');
+            }
 
             async function saveAll() {
-                const cron = document.getElementById('globalCron').value; const days = document.getElementById('globalInactiveDays').value;
-                if (cron && !isCronValid(cron)) { alert('全局 cron 格式可能无效'); return }
-                // 只提交全局与群配置为空时（快速路径）
-                const body = { globalCron: cron || undefined, inactiveDays: days ? Number(days) : undefined };
+                const cron = document.getElementById('globalCron').value;
+                const days = document.getElementById('globalInactiveDays').value;
+
+                if (cron && !isCronValid(cron)) {
+                    alert('全局 Cron 格式可能无效');
+                    return;
+                }
+
+                const body = {
+                    globalCron: cron || undefined,
+                    inactiveDays: days ? Number(days) : undefined
+                };
+
                 try {
                     const r = await fetchJson('/config', { method: 'POST', body: JSON.stringify(body) });
-                    const j = await r.json(); if (r.ok && j.code === 0) { alert('保存成功'); loadConfig() } else { alert('保存失败') }
-                } catch (e) { alert('保存异常') }
+                    const j = await r.json();
+                    if (r.ok && j.code === 0) {
+                        alert('保存成功');
+                        loadConfig();
+                        loadCronStatus();
+                    } else {
+                        alert('保存失败');
+                    }
+                } catch (e) {
+                    alert('保存异常');
+                }
             }
 
-            document.getElementById('refreshBtn').addEventListener('click', () => { fetchGroups(); loadConfig(); });
+            // Event listeners
+            document.getElementById('refreshBtn').addEventListener('click', () => {
+                fetchGroups();
+                loadConfig();
+                loadStatus();
+                loadCronStatus();
+            });
             document.getElementById('saveBtn').addEventListener('click', saveAll);
-            document.getElementById('q').addEventListener('input', () => fetchGroups());
-            document.getElementById('filter').addEventListener('change', () => fetchGroups());
+            document.getElementById('q').addEventListener('input', renderGroups);
+            document.getElementById('filter').addEventListener('change', renderGroups);
 
-            // expose modal handlers to global scope so inline onclick in generated HTML works
+            // Close modal on overlay click
+            document.getElementById('groupModal').addEventListener('click', (e) => {
+                if (e.target.id === 'groupModal') closeGroupModal();
+            });
+
+            // Escape key to close modal
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeGroupModal();
+            });
+
+            // Expose to global
             window.openGroupModal = openGroupModal;
             window.closeGroupModal = closeGroupModal;
             window.saveGroupFromModal = saveGroupFromModal;
 
-            // init
-            fetchGroups(); loadStatus(); loadConfig();
+            // Init
+            fetchGroups();
+            loadStatus();
+            loadConfig();
+            loadCronStatus();
         })();
     </script>
 </body>
