@@ -40,7 +40,7 @@ const LOG_TAG = '[AutoClear]';
 const plugin_init = async (ctx: NapCatPluginContext) => {
     // 记录启动时间，用于计算运行时长
     (ctx as any).__startTime = Date.now();
-    
+
     try {
         ctx.logger.info(`${LOG_TAG} 初始化开始 | name=${ctx.pluginName}, router=${Boolean(ctx.router)}`);
 
@@ -53,11 +53,27 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
 
         // 注册 WebUI 路由
         try {
+            // 为避免多处拼接前缀，这里包装一个带前缀的 router
+            const prefixedRouter = (() => {
+                const base = (ctx as any).router;
+                const prefix = ROUTE_PREFIX;
+                const wrapPath = (p: string) => {
+                    if (!p) return prefix;
+                    return p.startsWith('/') ? `${prefix}${p}` : `${prefix}/${p}`;
+                };
+                return {
+                    get: (p: string, ...args: any[]) => base.get(wrapPath(p), ...args),
+                    post: (p: string, ...args: any[]) => base.post(wrapPath(p), ...args),
+                    static: (p: string, dir: string) => base.static(wrapPath(p), dir),
+                    page: (opts: any) => base.page(opts),
+                };
+            })();
+
             // 静态资源目录
-            ctx.router.static(`${ROUTE_PREFIX}/static`, 'webui');
+            prefixedRouter.static('/static', 'webui');
 
             // 插件信息脚本
-            ctx.router.get(`${ROUTE_PREFIX}/static/plugin-info.js`, (_req: any, res: any) => {
+            prefixedRouter.get('/static/plugin-info.js', (_req: any, res: any) => {
                 try {
                     res.type('application/javascript');
                     res.send(`window.__PLUGIN_NAME__ = ${JSON.stringify(ctx.pluginName)};`);
@@ -67,7 +83,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 基础信息接口
-            ctx.router.get(`${ROUTE_PREFIX}/info`, (_req: any, res: any) => {
+            prefixedRouter.get('/info', (_req: any, res: any) => {
                 res.json({ code: 0, data: { pluginName: ctx.pluginName } });
             });
 
@@ -81,8 +97,8 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 状态接口
-            ctx.router.get(`${ROUTE_PREFIX}/status`, (_req: any, res: any) => {
-                const uptime = Date.now() - (ctx.__startTime || Date.now());
+            prefixedRouter.get('/status', (_req: any, res: any) => {
+                const uptime = Date.now() - (((ctx as any).__startTime) || Date.now());
                 res.json({
                     code: 0,
                     data: {
@@ -97,12 +113,12 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 配置读取接口
-            ctx.router.get(`${ROUTE_PREFIX}/config`, (_req: any, res: any) => {
+            prefixedRouter.get('/config', (_req: any, res: any) => {
                 res.json({ code: 0, data: getConfig() });
             });
 
             // 群列表接口
-            ctx.router.get(`${ROUTE_PREFIX}/groups`, async (_req: any, res: any) => {
+            prefixedRouter.get('/groups', async (_req: any, res: any) => {
                 try {
                     const data = await getGroupsWithPermissions(ctx);
                     res.json({ code: 0, data });
@@ -113,7 +129,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 配置保存接口
-            ctx.router.post(`${ROUTE_PREFIX}/config`, async (req: any, res: any) => {
+            prefixedRouter.post('/config', async (req: any, res: any) => {
                 try {
                     const newCfg = req.body || {};
                     const errors: string[] = [];
@@ -171,7 +187,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 定时任务状态接口
-            ctx.router.get(`${ROUTE_PREFIX}/cron/status`, (_req: any, res: any) => {
+            prefixedRouter.get('/cron/status', (_req: any, res: any) => {
                 try {
                     const status = getCronJobStatus();
                     res.json({ code: 0, data: status });
@@ -182,7 +198,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 更新群定时任务配置
-            ctx.router.post(`${ROUTE_PREFIX}/groups/:id/cron`, async (req: any, res: any) => {
+            prefixedRouter.post('/groups/:id/cron', async (req: any, res: any) => {
                 try {
                     const groupId = String(req.params?.id || '');
                     if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
@@ -213,7 +229,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 获取群定时任务配置
-            ctx.router.get(`${ROUTE_PREFIX}/groups/:id/cron`, (req: any, res: any) => {
+            prefixedRouter.get('/groups/:id/cron', (req: any, res: any) => {
                 try {
                     const groupId = String(req.params?.id || '');
                     if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
@@ -228,7 +244,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 手动触发群清理
-            ctx.router.post(`${ROUTE_PREFIX}/groups/:id/cleanup`, async (req: any, res: any) => {
+            prefixedRouter.post('/groups/:id/cleanup', async (req: any, res: any) => {
                 try {
                     const groupId = String(req.params?.id || '');
                     if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
@@ -254,7 +270,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 获取群清理结果
-            ctx.router.get(`${ROUTE_PREFIX}/groups/:id/cleanup/result`, (req: any, res: any) => {
+            prefixedRouter.get('/groups/:id/cleanup/result', (req: any, res: any) => {
                 try {
                     const groupId = String(req.params?.id || '');
                     if (!groupId) return res.status(400).json({ code: -1, message: 'missing group id' });
@@ -268,7 +284,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 清理统计接口
-            ctx.router.get(`${ROUTE_PREFIX}/cleanup/stats`, (_req: any, res: any) => {
+            prefixedRouter.get('/cleanup/stats', (_req: any, res: any) => {
                 try {
                     const stats = getCleanupStats();
                     res.json({ code: 0, data: stats });
