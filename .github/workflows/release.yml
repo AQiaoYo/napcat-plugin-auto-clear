@@ -5,21 +5,13 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (e.g., v1.0.0)'
-        required: false
-        default: ''
-
-permissions:
-  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -27,59 +19,40 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
         with:
-          version: 9
+          version: 8
 
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build project
+      - name: Build
         run: pnpm run build
 
-      - name: Prepare release package
+      - name: Prepare release files
         run: |
-          # 复制 package.json 到 dist 目录
-          cp package.json dist/
-          
-          # 复制 src/webui 文件夹到 dist 目录
-          cp -r src/webui dist/
-          
-          # 将 dist 文件夹重命名为 napcat-plugin-auto-clear
-          mv dist napcat-plugin-auto-clear
-          
-          # 压缩成 zip 文件
-          zip -r napcat-plugin-auto-clear.zip napcat-plugin-auto-clear
+          mkdir -p release
+          cp dist/index.mjs release/
+          cp package.json release/
+          cp -r src/webui release/webui
 
-      - name: Get version
-        id: version
+      - name: Create zip archive
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          else
-            echo "version=v$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
-          fi
+          cd release
+          zip -r ../napcat-plugin-auto-clear.zip .
 
-      - name: Create Release Draft
-        uses: softprops/action-gh-release@v2
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.version.outputs.version }}
-          name: Release ${{ steps.version.outputs.version }}
-          body: |
-            ## NapCat 自动清理不活跃群成员插件
-            
-            ### 安装方法
-            1. 下载 `napcat-plugin-auto-clear.zip`
-            2. 解压到 NapCat 的 `plugins` 目录
-            3. 重启 NapCat 或在 WebUI 中启用插件
-            
-            ### 更新内容
-            - 请在此处填写更新内容
-          draft: true
-          files: |
-            napcat-plugin-auto-clear.zip
+          name: napcat-plugin-auto-clear
+          path: napcat-plugin-auto-clear.zip
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: napcat-plugin-auto-clear.zip
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
