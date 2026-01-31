@@ -82,7 +82,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
             });
 
             // 仪表盘页面
-            ctx.router.page({
+            (ctx as any).router.page({
                 path: 'clear-dashboard',
                 title: '清理插件仪表盘',
                 icon: '🧹',
@@ -146,7 +146,7 @@ const plugin_init = async (ctx: NapCatPluginContext) => {
                         if (typeof newCfg.groupConfigs !== 'object') {
                             errors.push('groupConfigs: 必须为对象，键为群 ID');
                         } else {
-                            for (const [gid, gc] of Object.entries(newCfg.groupConfigs || {})) {
+                            for (const [gid, gc] of Object.entries(newCfg.groupConfigs || {}) as [string, Record<string, unknown>][]) {
                                 if (!gid) continue;
                                 if (gc && typeof gc === 'object') {
                                     if (gc.cron !== undefined && gc.cron !== null && String(gc.cron).trim() !== '') {
