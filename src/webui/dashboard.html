@@ -109,8 +109,10 @@
         }
 
         .group-list {
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE/Edge */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* IE/Edge */
         }
 
         /* Sidebar 滚动条 */
@@ -212,8 +214,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         /* Buttons */
@@ -334,7 +343,7 @@
             text-align: center;
         }
 
-        .card + .card {
+        .card+.card {
             margin-top: 20px;
         }
 
@@ -354,7 +363,7 @@
             padding-right: 4px;
         }
 
-        .sidebar .card + .card {
+        .sidebar .card+.card {
             margin-top: 0;
         }
 
@@ -685,8 +694,13 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
 
         .modal {
@@ -704,11 +718,12 @@
         }
 
         @keyframes slideUp {
-            from { 
+            from {
                 opacity: 0;
                 transform: translateY(20px);
             }
-            to { 
+
+            to {
                 opacity: 1;
                 transform: translateY(0);
             }
@@ -724,16 +739,22 @@
         }
 
         @keyframes fadeOut {
-            from { opacity: 1; }
-            to { opacity: 0; }
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
         }
 
         @keyframes slideDown {
-            from { 
+            from {
                 opacity: 1;
                 transform: translateY(0);
             }
-            to { 
+
+            to {
                 opacity: 0;
                 transform: translateY(20px);
             }
@@ -967,19 +988,19 @@
             height: 16px;
         }
 
-        .toggle input:checked + .toggle-slider {
+        .toggle input:checked+.toggle-slider {
             background: var(--accent);
         }
 
-        .toggle input:checked + .toggle-slider::before {
+        .toggle input:checked+.toggle-slider::before {
             transform: translateX(22px);
         }
 
-        .toggle.toggle-sm input:checked + .toggle-slider::before {
+        .toggle.toggle-sm input:checked+.toggle-slider::before {
             transform: translateX(18px);
         }
 
-        .toggle input:focus + .toggle-slider {
+        .toggle input:focus+.toggle-slider {
             box-shadow: 0 0 0 3px var(--accent-glow);
         }
 
@@ -1170,6 +1191,7 @@
                 opacity: 0;
                 transform: translateX(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateX(0);
@@ -1181,6 +1203,7 @@
                 opacity: 1;
                 transform: translateX(0);
             }
+
             to {
                 opacity: 0;
                 transform: translateX(20px);
@@ -1208,7 +1231,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* Responsive */
@@ -1448,7 +1473,8 @@
 
                         <div class="config-field">
                             <label class="config-label">不活跃天数阈值</label>
-                            <input type="number" id="globalInactiveDays" class="config-input" min="1" placeholder="30" />
+                            <input type="number" id="globalInactiveDays" class="config-input" min="1"
+                                placeholder="30" />
                             <div class="config-hint">成员多少天未发言视为"鱼干"</div>
                         </div>
 
@@ -1528,12 +1554,14 @@
 
                 <div class="form-group">
                     <label class="form-label">受保护成员 (白名单)</label>
-                    <input type="text" class="form-input form-input-mono" id="modalProtectedMembers" placeholder="QQ号，用逗号分隔，这些成员不会被清理" />
+                    <input type="text" class="form-input form-input-mono" id="modalProtectedMembers"
+                        placeholder="QQ号，用逗号分隔，这些成员不会被清理" />
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="triggerManualCleanup(true)">🔍 预览清理</button>
-                <button class="btn btn-primary" style="background: var(--danger);" onclick="triggerManualCleanup(false)">🧹 立即清理</button>
+                <button class="btn btn-primary" style="background: var(--danger);"
+                    onclick="triggerManualCleanup(false)">🧹 立即清理</button>
                 <button class="btn btn-primary" onclick="saveGroupFromModal()">💾 保存设置</button>
             </div>
         </div>
@@ -1541,8 +1569,8 @@
 
     <script>
         (function () {
-            const urlParams = new URLSearchParams(location.search);
-            const token = urlParams.get('webui_token') || '';
+            // 从 localStorage 获取 token（NapCat WebUI 鉴权方式）
+            const token = localStorage.getItem('token') || '';
 
             function authHeaders(h = {}) {
                 if (token) h['Authorization'] = 'Bearer ' + token;
@@ -1584,7 +1612,7 @@
                 const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
                 toast.innerHTML = `<span>${icon}</span><span>${esc(message)}</span>`;
                 container.appendChild(toast);
-                
+
                 setTimeout(() => {
                     toast.classList.add('fade-out');
                     setTimeout(() => toast.remove(), 300);
@@ -1617,7 +1645,7 @@
                 const years = Math.floor(days / 365);
 
                 const parts = [];
-                
+
                 if (years > 0) {
                     parts.push(`${years}年`);
                     const remainingMonths = Math.floor((days % 365) / 30);
@@ -1767,14 +1795,14 @@
                     const id = String(g.group_id);
                     const roleMap = { 'owner': '群主', 'admin': '管理员', 'member': '成员' };
                     const roleText = roleMap[g.role] || '成员';
-                    const roleBadge = g.role === 'owner' 
-                        ? '<span class="badge badge-success">群主</span>' 
-                        : g.role === 'admin' 
-                            ? '<span class="badge badge-warning">管理员</span>' 
+                    const roleBadge = g.role === 'owner'
+                        ? '<span class="badge badge-success">群主</span>'
+                        : g.role === 'admin'
+                            ? '<span class="badge badge-warning">管理员</span>'
                             : '<span class="badge badge-muted">' + esc(roleText) + '</span>';
-                    
-                    const kickBadge = g.canKick 
-                        ? '<span class="badge badge-success">可踢人</span>' 
+
+                    const kickBadge = g.canKick
+                        ? '<span class="badge badge-success">可踢人</span>'
                         : '<span class="badge badge-danger">无权限</span>';
 
                     const avatarUrl = `http://p.qlogo.cn/gh/${id}/${id}/100/`;
@@ -1807,16 +1835,16 @@
             }
 
             let currentGroupId = '';
-            
+
             async function openGroupModal(groupId) {
                 const modal = document.getElementById('groupModal');
                 currentGroupId = groupId;
-                
+
                 const group = groupsData.find(g => String(g.group_id) === groupId);
                 document.getElementById('modalGroupName').innerText = group?.group_name || '未知群';
                 document.getElementById('modalGroupId').innerText = `#${groupId}`;
                 document.getElementById('modalGroupAvatar').src = `http://p.qlogo.cn/gh/${groupId}/${groupId}/100/`;
-                
+
                 // Reset form
                 document.getElementById('modalEnabled').checked = false;
                 document.getElementById('modalCron').value = '';
@@ -1824,9 +1852,9 @@
                 document.getElementById('modalDryRun').checked = false;
                 document.getElementById('modalProtectedMembers').value = '';
                 document.getElementById('lastCleanupInfo').style.display = 'none';
-                
+
                 modal.classList.add('active');
-                
+
                 try {
                     const r = await fetchJson('/groups/' + encodeURIComponent(groupId) + '/cron', { method: 'GET' });
                     if (!r.ok) return;
@@ -1837,7 +1865,7 @@
                     document.getElementById('modalInactiveDays').value = cfg.inactiveDays || '';
                     document.getElementById('modalDryRun').checked = Boolean(cfg.dryRun === true);
                     document.getElementById('modalProtectedMembers').value = (cfg.protectedMembers || []).join(', ');
-                    
+
                     // 显示上次清理信息
                     if (cfg.lastCleanup) {
                         const lastDate = new Date(cfg.lastCleanup);
@@ -1865,7 +1893,7 @@
                 const inactiveDays = document.getElementById('modalInactiveDays').value;
                 const dryRun = document.getElementById('modalDryRun').checked;
                 const protectedMembersStr = document.getElementById('modalProtectedMembers').value;
-                
+
                 // 解析受保护成员列表
                 const protectedMembers = protectedMembersStr
                     .split(/[,，\s]+/)
@@ -1936,7 +1964,7 @@
                             showToast(`清理完成: 已清理 ${result.kickedMembers} 条鱼干`, 'success', 3000);
                         }
                         loadCleanupStats();
-                        
+
                         // 重新加载群配置以更新上次清理时间
                         openGroupModal(groupId);
                     } else {
